@@ -160,7 +160,5 @@ cython_debug/
 #.idea/
 
 # My Ignores
-AuxImages/*
-!AuxImages/heatmaps
-InputScenarios/*
-Solutions/*
+./test.py
+./____________ReplayMemory.py
