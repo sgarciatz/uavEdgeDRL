@@ -33,24 +33,39 @@ class NetworkEnv(gym.Env):
         self.worstCaseSolution = 0
         self.build_env(input_file)
 
+    def _get_info(self):
+
+        """
+        Returns a dictionary with all the info about of serving the
+        UAVs each microservice
+        """
+
+        info: dict = {}
+        for uav in list(self.graph.nodes):
+            info[f"{uav.id}-microservicesCosts"] =\
+                np.array(uav.microservicesCosts)
+            info[f"{uav.id}-cpuAvailable"] =\
+                np.array([uav.cpuCapacity - uav.cpuAllocated])
+            info[f"{uav.id}-ramAvailable"] =\
+                np.array([uav.ramCapacity - uav.ramAllocated])
+
+        for i, ms in enumerate(self.msToDeploy):
+            info[f"next_{i}-msId"] = ms.idToInt()
+            info[f"next_{i}-cpuReq"] = np.array([ms.cpuRequirement])
+            info[f"next_{i}-ramReq"] = np.array([ms.ramRequirement])
+        return info
+
     def _get_obs(self):
 
         """
         Return the cost of serving the UAVs each microservice
         """
-        observations: dict = {}
-        for uav in list(self.graph.nodes):
-            observations[f"{uav.id}-microservicesCosts"] = uav.microservicesCosts
-            observations[f"{uav.id}-cpuAvailable"] = uav.cpuCapacity - uav.cpuAllocated
-            observations[f"{uav.id}-ramAvailable"] = uav.ramCapacity - uav.ramAllocated
 
-        for i, ms in enumerate(self.msToDeploy):
-            observations[f"next_{i}-msId"] = ms.idToInt()
-            observations[f"next_{i}-cpuReq"] = ms.cpuRequirement
-            observations[f"next_{i}-ramReq"] = ms.ramRequirement
+        observation = self._get_info()
 
-          
-        return observations
+        return observation
+        
+
     def _connect_nodes(self):
     
         """
@@ -227,19 +242,19 @@ class NetworkEnv(gym.Env):
                 Box(0.0,
                     maxPathLength * 5,
                     shape=(len(self.microservices),),
-                    dtype=np.float32)
+                    dtype=np.float64)
                 
             observations[f"{uav.id}-cpuAvailable"] =\
                 Box(0.0,
                     uav.cpuCapacity,
                     shape=(1,),
-                    dtype=np.float32)
+                    dtype=np.float64)
                 
             observations[f"{uav.id}-ramAvailable"] =\
                 Box(0.0,
                     uav.cpuCapacity,
                     shape=(1,),
-                    dtype=np.float32)
+                    dtype=np.float64)
                 
                 
         for i, ms in enumerate(self.msToDeploy):
@@ -251,13 +266,13 @@ class NetworkEnv(gym.Env):
                 Box(0.0,
                     ms.cpuRequirement,
                     shape=(1,),
-                    dtype=np.float32)
+                    dtype=np.float64)
                     
             observations[f"next_{i}-ramReq"] =\
                 Box(0.0,
                     ms.ramRequirement,
                     shape=(1,),
-                    dtype=np.float32)
+                    dtype=np.float64)
                                 
         self.observation_space = Dict(observations, seed=42)
         self.action_space = Discrete(len(list(self.graph.nodes)),

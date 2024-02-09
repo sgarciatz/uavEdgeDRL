@@ -10,6 +10,9 @@ from ExperienceSampler import ExperienceSampler
 from ActionSelector import ActionSelector
 from Experience import Experience
 from EpsilonGreedyPolicy import EpsilonGreedyPolicy
+from BoltzmannPolicy import BoltzmannPolicy
+import numpy as np
+
 
 class DQLearning(object):
 
@@ -45,14 +48,14 @@ class DQLearning(object):
         - environment: the instance of the environment where the agent
          lives.
         """
-        self.training_steps = 600
+        self.training_steps = 1000
         self.memory_size = 32768
         self.h = 1024
-        self.batches = 16
+        self.batches = 8
         self.batch_size = 64
-        self.updates_per_batch = 8
+        self.updates_per_batch = 4
         
-        self.gamma = 0.99
+        self.gamma = 0.9
         self.learning_rate = 1e-4
 
         self.environment = environment
@@ -60,19 +63,24 @@ class DQLearning(object):
         self.n_observations =\
             flatten_space(self.environment.observation_space).shape[0]
 
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.policy_net = QNetwork(self.n_observations, self.n_actions).to(self.device)
+        self.device = torch.device("cpu")
+        if (torch.cuda.is_available()):
+            self.device = torch.device("cuda")
+        self.policy_net = QNetwork(self.n_observations, 
+                                   self.n_actions).to(self.device)
 
-        self.optimizer = optim.AdamW(self.policy_net.parameters(), lr=self.learning_rate, amsgrad=True)
+        self.optimizer = optim.AdamW(self.policy_net.parameters(),
+                                     lr=self.learning_rate, amsgrad=True)
         self.experience_sampler = ExperienceSampler(self.memory_size)
         self.loss_fn = torch.nn.MSELoss()
         
-        self.start_epsilon = 1.0
-        self.end_epsilon = 0.1
+        self.start_epsilon = 0.9
+        self.end_epsilon = 0.05
         self.action_policy = EpsilonGreedyPolicy(self.start_epsilon)
+        #self.action_policy = BoltzmannPolicy(5)
         self.action_selector = ActionSelector(
             self.action_policy,
-            decay_strategy = "linear",
+            decay_strategy = "exponential",
             start_exploration_rate = self.start_epsilon,
             end_exploration_rate = self.end_epsilon)
         self.steps_done = 0
@@ -91,23 +99,6 @@ class DQLearning(object):
 
         pass
 
-    def optimize_model():
-
-        """
-        Performs a single step of the optimization process. Firstly, it
-        samples a batch, 
-        """
-
-        if len(memory) < BATCH_SIZE:
-            return
-        batch = memory.sample(BATCH_SIZE)
-        
-        state_batch = torch.cat([t.state for t in batch])
-        action_batch = torch.cat([t.action for t in batch])
-        netx_state_batch = torch.cat([t.next_state for t in batch])
-        reward_batch = torch.cat([t.reward for t in batch])
-        non_final_mask = torch.tensor()
-        #TODO
 
     def _flatten_state(self, state) -> list:
 
@@ -115,10 +106,9 @@ class DQLearning(object):
         Helper function used to flatten the state dict in order to feed
         it to other methods.
         """
-        print(state)
         raw_state = []
         for value in list(state.values()):
-            if (isinstance(value, list)):
+            if (isinstance(value, np.ndarray)):
                 for value2 in value:
                     raw_state.append(value2)
             else:
@@ -149,7 +139,7 @@ class DQLearning(object):
                 q_tar = self.policy_net.forward(raw_state)
             action = self.action_selector.select_action(q_tar)
             next_state, reward, terminated, truncated, info =\
-                self.environment.step(action) 
+                self.environment.step(action)
             done = terminated or truncated
             experience = Experience(state, action, reward, next_state, done, 9999)  
             self.experience_sampler.add_experience(experience)
@@ -167,6 +157,7 @@ class DQLearning(object):
         for _ in range(10):
             done = False
             ep_length = 0
+            ep_reward = 0
             state, info = self.environment.reset()
 #            state = torch.Tensor(self._flatten_state(state))
             state = torch.Tensor(state)
@@ -180,7 +171,8 @@ class DQLearning(object):
                 state = torch.Tensor(next_state)
                 done = terminated or truncated
                 ep_length += 1
-            rewards.append(reward)
+                ep_reward += reward
+            rewards.append(ep_reward)
             ep_lengths.append(ep_length)
         return sum(rewards) / 10, sum(ep_lengths) / 10
 
@@ -256,9 +248,12 @@ class DQLearning(object):
                     update Qfunc estimator's parameters
             decrease exploring rate
         """
-
+        print("╔══════════════╦══════════════════╦════════╦════════════════════╦════════════════════╗")
+        print("║Training step ║ Exploration rate ║  Loss  ║ Avg Episode Reward ║ Avg Episode Lenght ║")
+        print("╠══════════════╬══════════════════╬════════╬════════════════════╬════════════════════╣")
         for step in range(self.training_steps):
-            print('Training step:', step)
+
+            step_losses = []
             self._gather_experiences()
             for b in range(self.batches):
                 batch = self._sample_experience_batch()
@@ -267,18 +262,23 @@ class DQLearning(object):
                     loss.backward()
                     self.optimizer.step()
                     self.optimizer.zero_grad()
-                    print(f"Loss: {loss.item():>7f} [Batch {b:>5d} Update {update:>5d}]")
+                    step_losses.append(loss.item())
 
             reward, ep_length = self._validate_learning()
-            print(f"Ending {step/self.training_steps} training step. Validation test: EpisodicReward = {reward}, Ep Length: {ep_length}")
-            self.action_selector.decay_exploration_rate(step/self.training_steps)
+            step_loss = round(sum(step_losses) / len(step_losses), 3)
+            loss_str = str(step_loss).center(8)
+            expl_str = str(round(self.action_selector.exploration_rate,5)).center(18)
+            reward_str = str(reward).center(20)
+            ep_length_str = str(ep_length).center(20)
+            print(f"║{str(step).center(14)}║{expl_str}║{loss_str}║{reward_str}║{ep_length_str}║")
+            self.action_selector.decay_exploration_rate(step, self.training_steps)
             # Validate the agent learning with the validation scenario
-
+        print("╚═══════════════════════════════════════════════════════════════════════════════════╝")
                 
 if __name__ == "__main__":
     import gymnasium as gym
     import gym_network
-#    myEnv = gym.make('NetworkEnv-v0', input_file='/home/santiago/Documents/Trabajo/Workspace/GLOMIM/glomim_v1/InputScenarios/paper2_small_01.json')
-    myEnv = gym.make("CartPole-v1")    
+    myEnv = gym.make('NetworkEnv-v0', input_file='/home/santiago/Documents/Trabajo/Workspace/GLOMIM/glomim_v1/InputScenarios/paper2_small_01.json')
+    myEnv = gym.make("CartPole-v1")
     agent = DQLearning(myEnv)
     agent.train()

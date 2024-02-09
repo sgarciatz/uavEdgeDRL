@@ -1,4 +1,5 @@
 import torch
+import math
 from Policy import Policy
 
 
@@ -12,7 +13,8 @@ class ActionSelector(object):
     
     def __init__(self, policy: Policy, decay_strategy: str = 'linear',
                  start_exploration_rate: float = 1, 
-                 end_exploration_rate: float = 0.1) -> None:
+                 end_exploration_rate: float = 0.1,
+                 decay_rate: float = 1000.0) -> None:
 
         """
         Initialize the action selection policy, the initial and final,
@@ -24,6 +26,7 @@ class ActionSelector(object):
         self.start_exploration_rate = start_exploration_rate
         self.end_exploration_rate = end_exploration_rate
         self.exploration_rate = start_exploration_rate
+        self.decay_rate = decay_rate
         self.policy.update_exploration_rate(self.exploration_rate)
 
     def select_action(self, q_values: torch.Tensor) -> int:
@@ -44,24 +47,30 @@ class ActionSelector(object):
         action = self.policy.select_action(q_values)
         return action
 
-    def decay_exploration_rate(self, training_done_ratio: int) -> None:
+    def decay_exploration_rate(self, current_step: int, training_steps: int) -> None:
 
         """
         This function decays the exploration rate according to the 
         specified decay strategy.
         
         Parameters:
-        - training_done_ratio: The percentage of the training process
-         done expressed as a ratio.
+        - current_step: The number of completed steps.
+        - training_steps: The number of step until the completion of
+          training.
         """
 
         if (self.decay_strategy == "linear"):
+            training_ratio = current_step / training_steps
             self.exploration_rate =\
-                (1 - training_done_ratio) * self.start_exploration_rate\
-                + training_done_ratio * self.end_exploration_rate
+                (1 - training_ratio) * self.start_exploration_rate\
+                + training_ratio * self.end_exploration_rate
         elif (self.decay_strategy == "freefall"):
             pass
-        self.policy.update_exploration_rate(self.exploration_rate)
+        elif (self.decay_strategy == "exponential"):
+            exponent = -1 * (current_step) * math.e / training_steps
+            self.exploration_rate =\
+                self.start_exploration_rate * math.exp(exponent) 
+            self.policy.update_exploration_rate(self.exploration_rate)
 
 if __name__ == "__main__":
     print("BoltzmannPolicy")

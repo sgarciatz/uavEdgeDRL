@@ -42,9 +42,6 @@ class BoltzmannPolicy(Policy):
         probabilities = exp_values / torch.sum(exp_values)
         sampled_action = torch.multinomial(probabilities, 1).item()
         
-        print(q_values)
-        print(probabilities)
-        print(sampled_action)
         return sampled_action
 
     def update_exploration_rate(self, new_value) -> None:

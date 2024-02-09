@@ -35,15 +35,16 @@ class EpsilonGreedyPolicy(Policy):
         - int: The index that refers to the selected action
         """
         
-        random_number = torch.rand(1)
+        random_number = torch.rand(1).item()
 
-        if random_number > self.epsilon:
+        condition = (random_number - self.epsilon) > 0.0
+        if (condition):
             action = torch.argmax(q_values).item()
             
         else:
             probabilities = torch.ones(q_values.shape, dtype= torch.float64)
             action = torch.multinomial(probabilities, 1).item()
-        
+
         return action
         
     def update_exploration_rate(self, new_value) -> None:
