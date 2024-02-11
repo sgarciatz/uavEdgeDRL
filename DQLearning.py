@@ -12,6 +12,7 @@ from Experience import Experience
 from EpsilonGreedyPolicy import EpsilonGreedyPolicy
 from BoltzmannPolicy import BoltzmannPolicy
 import numpy as np
+import random
 
 
 class DQLearning(object):
@@ -76,13 +77,15 @@ class DQLearning(object):
         
         self.start_epsilon = 0.9
         self.end_epsilon = 0.05
+        self.decay_rate = 1000
         self.action_policy = EpsilonGreedyPolicy(self.start_epsilon)
         #self.action_policy = BoltzmannPolicy(5)
         self.action_selector = ActionSelector(
             self.action_policy,
             decay_strategy = "exponential",
             start_exploration_rate = self.start_epsilon,
-            end_exploration_rate = self.end_epsilon)
+            end_exploration_rate = self.end_epsilon,
+            decay_rate = self.decay_rate)
         self.steps_done = 0
         self.episodes_duration = []
         self.episodes_reward = []
@@ -134,7 +137,7 @@ class DQLearning(object):
                 state = next_state
 
 #            raw_state = torch.Tensor(self._flatten_state(state))
-            raw_state = torch.Tensor(state)
+            raw_state = torch.Tensor(state).to(self.device)
             with (torch.no_grad()):
                 q_tar = self.policy_net.forward(raw_state)
             action = self.action_selector.select_action(q_tar)
@@ -160,7 +163,7 @@ class DQLearning(object):
             ep_reward = 0
             state, info = self.environment.reset()
 #            state = torch.Tensor(self._flatten_state(state))
-            state = torch.Tensor(state)
+            state = torch.Tensor(state).to(self.device)
             while (not done):
                 with (torch.no_grad()):
                     q_estimate = self.policy_net.forward(state)
@@ -168,7 +171,7 @@ class DQLearning(object):
                 next_state, reward, terminated, truncated, info =\
                     self.environment.step(action)
 #                state = torch.Tensor(self._flatten_state(next_state))
-                state = torch.Tensor(next_state)
+                state = torch.Tensor(next_state).to(self.device)
                 done = terminated or truncated
                 ep_length += 1
                 ep_reward += reward
@@ -192,9 +195,9 @@ class DQLearning(object):
         the current policy network.
         """
 #        state = torch.Tensor(self._flatten_state(experience.next_state))
-        state = torch.Tensor(experience.next_state)
+        state = torch.Tensor(experience.next_state).to(self.device)
         reward = float(experience.reward)
-        q_target = torch.full((self.n_actions,), reward)
+        q_target = torch.full((self.n_actions,), reward).to(self.device)
         if (not experience.done):
             with (torch.no_grad()):
                 q_target_next = self.policy_net(state).max()
@@ -208,7 +211,7 @@ class DQLearning(object):
         possible action.
         """
 #        state = torch.Tensor(self._flatten_state(experience.state))
-        state = torch.Tensor(experience.state)
+        state = torch.Tensor(experience.state).to(self.device)
         q_preds = self.policy_net(state)
         return q_preds
 
@@ -219,18 +222,60 @@ class DQLearning(object):
         """ 
 
         q_preds = []
+        q_tars = []        
         for experience in batch:
             q_pred = self._get_q_pred(experience)
             q_preds.append(q_pred)
-        q_preds = torch.cat(q_preds, dim=0)
-        
-        q_tars = []
-        for experience in batch:
             q_tar = self._get_q_target(experience)
             q_tars.append(q_tar)
-        q_tars = torch.cat(q_tars, dim=0)
+        q_preds = torch.cat(q_preds, dim=0).to(self.device)
+        q_tars = torch.cat(q_tars, dim=0).to(self.device) 
         loss = self.loss_fn(q_preds, q_tars)
         return loss
+
+    def print_training_header(self):
+
+        """
+        Print the header of the training table.
+        """
+
+        print("╔════════╦═══════════╦════════╦═══════════╦═══════════╗")
+        print("║Training║Exploration║  Loss  ║Avg Episode║Avg Episode║")
+        print("║  step  ║   rate    ║        ║  Reward   ║  Lenght   ║")
+        print("╠════════╬═══════════╬════════╬═══════════╬═══════════╣")
+
+    def print_training_step(self, step, loss, expl_rate, reward, ep_length):
+
+        """
+        Print the results of a training step.
+        
+        Arguments:
+        - step: The number of the current step.
+        - loss: The mean loss of the training step.
+        - expl_rate: The current exploration rate.
+        - reward: The reward obtained in the validation.
+        - ep_length: The mean episode duration of the validation.
+        """
+
+        step_str = str(step).center(8)
+        step_loss = round(sum(loss) / len(loss), 3)
+        loss_str = str(step_loss).center(8)
+        expl_str = round(self.action_selector.exploration_rate,5)
+        expl_str = str(expl_str).center(11)
+        reward_str = str(reward).center(11)
+        ep_length_str = str(ep_length).center(11)
+        print(f"║{step_str}║{expl_str}║{loss_str}"\
+               + f"║{reward_str}║{ep_length_str}║")
+
+    def print_training_footer(self):
+
+        """
+        Print the footer of the training table.
+        """
+
+        print("╚═════════════════════════════════════════════════════╝")
+
+
 
     def train(self):
 
@@ -248,9 +293,8 @@ class DQLearning(object):
                     update Qfunc estimator's parameters
             decrease exploring rate
         """
-        print("╔══════════════╦══════════════════╦════════╦════════════════════╦════════════════════╗")
-        print("║Training step ║ Exploration rate ║  Loss  ║ Avg Episode Reward ║ Avg Episode Lenght ║")
-        print("╠══════════════╬══════════════════╬════════╬════════════════════╬════════════════════╣")
+
+        self.print_training_header()
         for step in range(self.training_steps):
 
             step_losses = []
@@ -259,26 +303,30 @@ class DQLearning(object):
                 batch = self._sample_experience_batch()
                 for update in range(self.updates_per_batch):
                     loss = self.calculate_q_loss(batch)
+                    print(loss)
+                    exit()
+                    self.optimizer.zero_grad()                    
                     loss.backward()
                     self.optimizer.step()
-                    self.optimizer.zero_grad()
                     step_losses.append(loss.item())
 
             reward, ep_length = self._validate_learning()
-            step_loss = round(sum(step_losses) / len(step_losses), 3)
-            loss_str = str(step_loss).center(8)
-            expl_str = str(round(self.action_selector.exploration_rate,5)).center(18)
-            reward_str = str(reward).center(20)
-            ep_length_str = str(ep_length).center(20)
-            print(f"║{str(step).center(14)}║{expl_str}║{loss_str}║{reward_str}║{ep_length_str}║")
+            self.print_training_step(step,
+                                     step_losses, 
+                                     self.action_selector.exploration_rate,
+                                     reward,
+                                     ep_length)
             self.action_selector.decay_exploration_rate(step, self.training_steps)
             # Validate the agent learning with the validation scenario
-        print("╚═══════════════════════════════════════════════════════════════════════════════════╝")
+        self.print_training_footer()
                 
 if __name__ == "__main__":
     import gymnasium as gym
     import gym_network
-    myEnv = gym.make('NetworkEnv-v0', input_file='/home/santiago/Documents/Trabajo/Workspace/GLOMIM/glomim_v1/InputScenarios/paper2_small_01.json')
+    random.seed(0)
+    np.random.seed(0)
+    torch.manual_seed(0)
+#    myEnv = gym.make('NetworkEnv-v0', input_file='/home/santiago/Documents/Trabajo/Workspace/GLOMIM/glomim_v1/InputScenarios/paper2_small_01.json')
     myEnv = gym.make("CartPole-v1")
     agent = DQLearning(myEnv)
     agent.train()

@@ -54,6 +54,7 @@ class EpsilonGreedyPolicy(Policy):
         """
         
         self.epsilon = new_value
+
 if __name__ == "__main__":
     epsilon = 0.1
     myPolicy = EpsilonGreedyPolicy(epsilon)
