@@ -28,15 +28,16 @@ class Experience(object):
         self.state = state
         self.action = action
         self.reward = reward
-        self.next_state = next_state        
+        self.next_state = next_state
         self.done = done
         self.priority = priority
-    
+
     def get_state(self) -> torch.Tensor:
 
         """
         Return a Tensor containing the state information.
         """
+
         state = torch.Tensor(self.state.values(), dtype = torch.float64)
         return state
     
@@ -51,7 +52,7 @@ class Experience(object):
         string += f"\tAction: {self.action}\n" 
         string += f"\tReward: {self.reward}\n" 
         string += f"\tNext state: {self.next_state}\n" 
-        string += f"\tIs terminal: {self.done}\n"                                 
+        string += f"\tIs terminal: {self.done}\n"
         string += f"\tPriority: {self.priority}\n"
 
         return string

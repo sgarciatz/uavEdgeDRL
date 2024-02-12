@@ -24,9 +24,9 @@ class QNetwork(nn.Module):
         """
 
         super(QNetwork, self).__init__()
-        self.input_layer = nn.Linear(n_observations, 64)
+        self.input_layer = nn.Linear(n_observations, 128)
         self.hidden_layer = nn.Linear(self.input_layer.out_features,
-                                      64)
+                                      128)
         self.output_layer = nn.Linear(self.hidden_layer.out_features,
                                       n_actions)
 

@@ -8,7 +8,7 @@ class ActionSelector(object):
 
     """
     This class is responsible of interacting with the policies. It must
-    know how to decrease the learning rate of each one
+    know how to decrease the learning rate of each one.
     """
     
     def __init__(self, policy: Policy, decay_strategy: str = 'linear',

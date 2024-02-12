@@ -189,12 +189,12 @@ class NetworkEnv(gym.Env):
                 currentSolution += msCost
         
         reward = 1 - (currentSolution / self.worstCaseSolution)
-#        print("Episode Reward: 1 - (", 
-#              currentSolution,
-#              "/",
-#              self.worstCaseSolution,
-#              ") = ",
-#              reward)
+        print("Episode Reward: 1 - (", 
+              currentSolution,
+              "/",
+              self.worstCaseSolution,
+              ") = ",
+              reward)
         return reward
         
         
@@ -334,7 +334,7 @@ class NetworkEnv(gym.Env):
         dstUav.deployMicroservice(ms, msIndex)
 
         self._recalculate_costs(dstUav, msIndex)
-
+    
         observation = self._get_obs()
         
         terminated = False        
@@ -343,7 +343,7 @@ class NetworkEnv(gym.Env):
             terminated = True
             reward = self._get_reward()
 
-        info = {}
+        info = self._get_info()
         
         return observation, reward, terminated, False, info
         
@@ -352,10 +352,11 @@ class NetworkEnv(gym.Env):
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
 
-    myEnv = NetworkEnv('/home/santiago/Documents/Trabajo/Workspace/GLOMIM/glomim_v1/InputScenarios/paper2_large_01.json')
+    myEnv = NetworkEnv('/home/santiago/Downloads/paper2_large_01.json')
     observation, info = myEnv.reset()
-    visualize_graph(myEnv.graph)
+    #visualize_graph(myEnv.graph)
     steps = len(myEnv.msToDeploy)
-    print(steps)
     for index in range(steps):
-        myEnv.step(index)
+        obs, reward, terminated, truncated, info = myEnv.step(index*3)
+
+        

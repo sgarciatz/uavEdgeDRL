@@ -49,13 +49,14 @@ class DQLearning(object):
         - environment: the instance of the environment where the agent
          lives.
         """
-        self.training_steps = 1000
+
+        self.training_steps = 600
         self.memory_size = 32768
         self.h = 1024
         self.batches = 8
-        self.batch_size = 64
-        self.updates_per_batch = 4
-        
+        self.batch_size = 128
+        self.updates_per_batch = 8
+
         self.gamma = 0.9
         self.learning_rate = 1e-4
 
@@ -156,7 +157,6 @@ class DQLearning(object):
 
         rewards = []
         ep_lengths = []
-
         for _ in range(10):
             done = False
             ep_length = 0
@@ -194,6 +194,7 @@ class DQLearning(object):
         Recieves an experience and calculates its target Q-value using
         the current policy network.
         """
+
 #        state = torch.Tensor(self._flatten_state(experience.next_state))
         state = torch.Tensor(experience.next_state).to(self.device)
         reward = float(experience.reward)
@@ -210,6 +211,7 @@ class DQLearning(object):
         Recieves an experience and estimates the Q-value of taking each
         possible action.
         """
+
 #        state = torch.Tensor(self._flatten_state(experience.state))
         state = torch.Tensor(experience.state).to(self.device)
         q_preds = self.policy_net(state)
@@ -222,7 +224,7 @@ class DQLearning(object):
         """ 
 
         q_preds = []
-        q_tars = []        
+        q_tars = []
         for experience in batch:
             q_pred = self._get_q_pred(experience)
             q_preds.append(q_pred)
@@ -260,7 +262,7 @@ class DQLearning(object):
         step_str = str(step).center(8)
         step_loss = round(sum(loss) / len(loss), 3)
         loss_str = str(step_loss).center(8)
-        expl_str = round(self.action_selector.exploration_rate,5)
+        expl_str = round(self.action_selector.exploration_rate, 5)
         expl_str = str(expl_str).center(11)
         reward_str = str(reward).center(11)
         ep_length_str = str(ep_length).center(11)
@@ -302,11 +304,8 @@ class DQLearning(object):
             for b in range(self.batches):
                 batch = self._sample_experience_batch()
                 for update in range(self.updates_per_batch):
+                    self.optimizer.zero_grad()
                     loss = self.calculate_q_loss(batch)
-                    print(loss)
-                    exit()
-                    self.optimizer.zero_grad()                    
-                    loss.backward()
                     self.optimizer.step()
                     step_losses.append(loss.item())
 
@@ -317,7 +316,6 @@ class DQLearning(object):
                                      reward,
                                      ep_length)
             self.action_selector.decay_exploration_rate(step, self.training_steps)
-            # Validate the agent learning with the validation scenario
         self.print_training_footer()
                 
 if __name__ == "__main__":
@@ -328,5 +326,6 @@ if __name__ == "__main__":
     torch.manual_seed(0)
 #    myEnv = gym.make('NetworkEnv-v0', input_file='/home/santiago/Documents/Trabajo/Workspace/GLOMIM/glomim_v1/InputScenarios/paper2_small_01.json')
     myEnv = gym.make("CartPole-v1")
+#    myEnv = gym.make("TestEnv-v0")
     agent = DQLearning(myEnv)
     agent.train()
