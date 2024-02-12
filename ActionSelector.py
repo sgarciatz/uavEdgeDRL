@@ -59,6 +59,7 @@ class ActionSelector(object):
           training.
         """
 
+        current_step += 1
         if (self.decay_strategy == "linear"):
             training_ratio = current_step / training_steps
             self.exploration_rate =\
