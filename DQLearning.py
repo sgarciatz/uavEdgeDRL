@@ -11,6 +11,7 @@ from ActionSelector import ActionSelector
 from Experience import Experience
 from EpsilonGreedyPolicy import EpsilonGreedyPolicy
 from BoltzmannPolicy import BoltzmannPolicy
+from TrainLogger import TrainLogger
 import numpy as np
 import random
 
@@ -50,7 +51,7 @@ class DQLearning(object):
          lives.
         """
 
-        self.training_steps = 600
+        self.training_steps = 20
         self.memory_size = 32768
         self.h = 1024
         self.batches = 8
@@ -90,9 +91,7 @@ class DQLearning(object):
         self.steps_done = 0
         self.episodes_duration = []
         self.episodes_reward = []
-        
-
-
+        self.logger = TrainLogger()
 
     def plot_results(self, show_results=False):
 
@@ -235,50 +234,6 @@ class DQLearning(object):
         loss = self.loss_fn(q_preds, q_tars)
         return loss
 
-    def print_training_header(self):
-
-        """
-        Print the header of the training table.
-        """
-
-        print("╔════════╦═══════════╦════════╦═══════════╦═══════════╗")
-        print("║Training║Exploration║  Loss  ║Avg Episode║Avg Episode║")
-        print("║  step  ║   rate    ║        ║  Reward   ║  Lenght   ║")
-        print("╠════════╬═══════════╬════════╬═══════════╬═══════════╣")
-
-    def print_training_step(self, step, loss, expl_rate, reward, ep_length):
-
-        """
-        Print the results of a training step.
-        
-        Arguments:
-        - step: The number of the current step.
-        - loss: The mean loss of the training step.
-        - expl_rate: The current exploration rate.
-        - reward: The reward obtained in the validation.
-        - ep_length: The mean episode duration of the validation.
-        """
-
-        step_str = str(step).center(8)
-        step_loss = round(sum(loss) / len(loss), 3)
-        loss_str = str(step_loss).center(8)
-        expl_str = round(self.action_selector.exploration_rate, 5)
-        expl_str = str(expl_str).center(11)
-        reward_str = str(reward).center(11)
-        ep_length_str = str(ep_length).center(11)
-        print(f"║{step_str}║{expl_str}║{loss_str}"\
-               + f"║{reward_str}║{ep_length_str}║")
-
-    def print_training_footer(self):
-
-        """
-        Print the footer of the training table.
-        """
-
-        print("╚═════════════════════════════════════════════════════╝")
-
-
-
     def train(self):
 
         """
@@ -296,7 +251,7 @@ class DQLearning(object):
             decrease exploring rate
         """
 
-        self.print_training_header()
+        self.logger.print_training_header()
         for step in range(self.training_steps):
 
             step_losses = []
@@ -307,16 +262,17 @@ class DQLearning(object):
                     self.optimizer.zero_grad()
                     loss = self.calculate_q_loss(batch)
                     self.optimizer.step()
+                    loss.backward()
                     step_losses.append(loss.item())
-
             reward, ep_length = self._validate_learning()
-            self.print_training_step(step,
-                                     step_losses, 
-                                     self.action_selector.exploration_rate,
-                                     reward,
-                                     ep_length)
+            self.logger.add_training_step(step, 
+                                          self.action_selector.exploration_rate,
+                                          step_losses,
+                                          reward,
+                                          ep_length)
+            self.logger.print_training_step()
             self.action_selector.decay_exploration_rate(step, self.training_steps)
-        self.print_training_footer()
+        self.logger.print_training_footer()
                 
 if __name__ == "__main__":
     import gymnasium as gym
@@ -325,7 +281,8 @@ if __name__ == "__main__":
     np.random.seed(0)
     torch.manual_seed(0)
 #    myEnv = gym.make('NetworkEnv-v0', input_file='/home/santiago/Documents/Trabajo/Workspace/GLOMIM/glomim_v1/InputScenarios/paper2_small_01.json')
-    myEnv = gym.make("CartPole-v1")
-#    myEnv = gym.make("TestEnv-v0")
+#    myEnv = gym.make("CartPole-v1")
+    myEnv = gym.make("TestEnv-v0")
     agent = DQLearning(myEnv)
     agent.train()
+    

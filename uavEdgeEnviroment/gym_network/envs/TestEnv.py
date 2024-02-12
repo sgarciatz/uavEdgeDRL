@@ -76,7 +76,7 @@ class TestEnv(gym.Env):
         in the enviroment.
         """
 
-        if (action == 1):
+        if (action == 0):
             self.agent_pos += 1
         else:
             self.agent_pos -= 1
