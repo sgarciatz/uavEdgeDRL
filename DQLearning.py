@@ -51,7 +51,7 @@ class DQLearning(object):
          lives.
         """
 
-        self.training_steps = 20
+        self.training_steps = 100
         self.memory_size = 32768
         self.h = 1024
         self.batches = 8
@@ -59,7 +59,7 @@ class DQLearning(object):
         self.updates_per_batch = 8
 
         self.gamma = 0.9
-        self.learning_rate = 1e-4
+        self.learning_rate = 1e-6
 
         self.environment = environment
         self.n_actions = self.environment.action_space.n
@@ -79,9 +79,9 @@ class DQLearning(object):
         
         self.start_epsilon = 0.9
         self.end_epsilon = 0.05
-        self.decay_rate = 1000
-        self.action_policy = EpsilonGreedyPolicy(self.start_epsilon)
-        #self.action_policy = BoltzmannPolicy(5)
+        self.decay_rate = 1.0
+#        self.action_policy = EpsilonGreedyPolicy(self.start_epsilon)
+        self.action_policy = BoltzmannPolicy(self.start_epsilon)
         self.action_selector = ActionSelector(
             self.action_policy,
             decay_strategy = "exponential",
@@ -259,10 +259,10 @@ class DQLearning(object):
             for b in range(self.batches):
                 batch = self._sample_experience_batch()
                 for update in range(self.updates_per_batch):
-                    self.optimizer.zero_grad()
                     loss = self.calculate_q_loss(batch)
-                    self.optimizer.step()
                     loss.backward()
+                    self.optimizer.step()
+                    self.optimizer.zero_grad()
                     step_losses.append(loss.item())
             reward, ep_length = self._validate_learning()
             self.logger.add_training_step(step, 
@@ -281,8 +281,8 @@ if __name__ == "__main__":
     np.random.seed(0)
     torch.manual_seed(0)
 #    myEnv = gym.make('NetworkEnv-v0', input_file='/home/santiago/Documents/Trabajo/Workspace/GLOMIM/glomim_v1/InputScenarios/paper2_small_01.json')
-#    myEnv = gym.make("CartPole-v1")
-    myEnv = gym.make("TestEnv-v0")
+    myEnv = gym.make("CartPole-v1")
+#    myEnv = gym.make("TestEnv-v0")
     agent = DQLearning(myEnv)
     agent.train()
-    
+    agent.logger.plot_rewards()

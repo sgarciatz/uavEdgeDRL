@@ -36,7 +36,6 @@ class EpsilonGreedyPolicy(Policy):
         """
         
         random_number = torch.rand(1).item()
-
         condition = (random_number - self.epsilon) > 0.0
         if (condition):
             action = torch.argmax(q_values).item()

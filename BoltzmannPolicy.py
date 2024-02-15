@@ -37,11 +37,10 @@ class BoltzmannPolicy(Policy):
         Returns:
         - int: The index that refers to the selected action
         """
-        
+
         exp_values = torch.exp(q_values / self.temperature)
         probabilities = exp_values / torch.sum(exp_values)
         sampled_action = torch.multinomial(probabilities, 1).item()
-        
         return sampled_action
 
     def update_exploration_rate(self, new_value) -> None:
@@ -51,7 +50,7 @@ class BoltzmannPolicy(Policy):
         """
 
         self.temperature = new_value
-                
+
 if __name__ == "__main__":
     
     temperature = 1

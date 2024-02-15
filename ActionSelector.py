@@ -11,7 +11,9 @@ class ActionSelector(object):
     know how to decrease the learning rate of each one.
     """
     
-    def __init__(self, policy: Policy, decay_strategy: str = 'linear',
+    def __init__(self,
+                 policy: Policy,
+                 decay_strategy: str = 'linear',
                  start_exploration_rate: float = 1, 
                  end_exploration_rate: float = 0.1,
                  decay_rate: float = 1000.0) -> None:
@@ -68,9 +70,10 @@ class ActionSelector(object):
         elif (self.decay_strategy == "freefall"):
             pass
         elif (self.decay_strategy == "exponential"):
-            exponent = -1 * (current_step) * math.e / training_steps
+            training_ratio = current_step / training_steps
+            exponent = -1 * training_ratio * math.e * self.decay_rate
             self.exploration_rate =\
-                self.start_exploration_rate * math.exp(exponent) 
+                self.start_exploration_rate * math.exp(exponent)
             self.policy.update_exploration_rate(self.exploration_rate)
 
 if __name__ == "__main__":
