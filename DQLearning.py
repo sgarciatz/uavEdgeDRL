@@ -6,6 +6,7 @@ from gymnasium.spaces.utils import flatten_space
 import random
 import math
 from QNetwork import QNetwork
+from QEstimator import QEstimator
 from ExperienceSampler import ExperienceSampler
 from ActionSelector import ActionSelector
 from Experience import Experience
@@ -51,7 +52,8 @@ class DQLearning(object):
          lives.
         """
 
-        self.training_steps = 100
+        #Set hyperparameters
+        self.training_steps = 600
         self.memory_size = 32768
         self.h = 1024
         self.batches = 8
@@ -60,48 +62,54 @@ class DQLearning(object):
 
         self.gamma = 0.9
         self.learning_rate = 1e-6
-
+        
+        #Read the env
         self.environment = environment
         self.n_actions = self.environment.action_space.n
         self.n_observations =\
             flatten_space(self.environment.observation_space).shape[0]
 
+        #Set the device for torch
         self.device = torch.device("cpu")
         if (torch.cuda.is_available()):
             self.device = torch.device("cuda")
-        self.policy_net = QNetwork(self.n_observations, 
-                                   self.n_actions).to(self.device)
 
-        self.optimizer = optim.AdamW(self.policy_net.parameters(),
+        #Prepare the QEstimator
+        policy_net = QNetwork(self.n_observations,
+                                   self.n_actions).to(self.device)
+        target_net = QNetwork(self.n_observations,
+                                   self.n_actions).to(self.device)
+        optimizer = optim.AdamW(policy_net.parameters(),
                                      lr=self.learning_rate, amsgrad=True)
+        loss_fn = torch.nn.MSELoss()
+        update_policy = "polyak"
+        self.polyak_param = 0.02
+        self.q_estimator = QEstimator(policy_net,
+                                      optimizer,
+                                      loss_fn,
+                                      self.gamma,
+                                      self.device,
+                                      update_policy,
+                                      target_net
+                                      )
+        #Prepare the ExpercienceSampler
         self.experience_sampler = ExperienceSampler(self.memory_size)
-        self.loss_fn = torch.nn.MSELoss()
-        
+
+        #Prepare the ActionSelector
         self.start_epsilon = 0.9
         self.end_epsilon = 0.05
         self.decay_rate = 1.0
-#        self.action_policy = EpsilonGreedyPolicy(self.start_epsilon)
-        self.action_policy = BoltzmannPolicy(self.start_epsilon)
+        self.action_policy = EpsilonGreedyPolicy(self.start_epsilon)
+#        self.action_policy = BoltzmannPolicy(self.start_epsilon)
         self.action_selector = ActionSelector(
             self.action_policy,
             decay_strategy = "exponential",
             start_exploration_rate = self.start_epsilon,
             end_exploration_rate = self.end_epsilon,
             decay_rate = self.decay_rate)
-        self.steps_done = 0
-        self.episodes_duration = []
-        self.episodes_reward = []
+
+        #Prepare the logging class TrainLogger
         self.logger = TrainLogger()
-
-    def plot_results(self, show_results=False):
-
-        """
-        Plot the results of the training. This should include, the
-        reward and the episode duration in steps.
-        """
-
-        pass
-
 
     def _flatten_state(self, state) -> list:
 
@@ -139,7 +147,7 @@ class DQLearning(object):
 #            raw_state = torch.Tensor(self._flatten_state(state))
             raw_state = torch.Tensor(state).to(self.device)
             with (torch.no_grad()):
-                q_tar = self.policy_net.forward(raw_state)
+                q_tar = self.q_estimator.q_estimator(raw_state)
             action = self.action_selector.select_action(q_tar)
             next_state, reward, terminated, truncated, info =\
                 self.environment.step(action)
@@ -165,7 +173,7 @@ class DQLearning(object):
             state = torch.Tensor(state).to(self.device)
             while (not done):
                 with (torch.no_grad()):
-                    q_estimate = self.policy_net.forward(state)
+                    q_estimate = self.q_estimator.q_estimator(state)
                 action = self.action_selector.select_action(q_estimate)
                 next_state, reward, terminated, truncated, info =\
                     self.environment.step(action)
@@ -187,53 +195,6 @@ class DQLearning(object):
         batch = self.experience_sampler.sample_experience(self.batch_size)
         return batch
 
-    def _get_q_target(self, experience: Experience) -> float:
-
-        """
-        Recieves an experience and calculates its target Q-value using
-        the current policy network.
-        """
-
-#        state = torch.Tensor(self._flatten_state(experience.next_state))
-        state = torch.Tensor(experience.next_state).to(self.device)
-        reward = float(experience.reward)
-        q_target = torch.full((self.n_actions,), reward).to(self.device)
-        if (not experience.done):
-            with (torch.no_grad()):
-                q_target_next = self.policy_net(state).max()
-            q_target += self.gamma * q_target_next
-        return q_target
-
-    def _get_q_pred(self, experience: Experience) -> torch.Tensor:
-
-        """
-        Recieves an experience and estimates the Q-value of taking each
-        possible action.
-        """
-
-#        state = torch.Tensor(self._flatten_state(experience.state))
-        state = torch.Tensor(experience.state).to(self.device)
-        q_preds = self.policy_net(state)
-        return q_preds
-
-    def calculate_q_loss(self, batch):
-
-        """
-        Given a batch, calculate the loss using the given loss_fn.
-        """ 
-
-        q_preds = []
-        q_tars = []
-        for experience in batch:
-            q_pred = self._get_q_pred(experience)
-            q_preds.append(q_pred)
-            q_tar = self._get_q_target(experience)
-            q_tars.append(q_tar)
-        q_preds = torch.cat(q_preds, dim=0).to(self.device)
-        q_tars = torch.cat(q_tars, dim=0).to(self.device) 
-        loss = self.loss_fn(q_preds, q_tars)
-        return loss
-
     def train(self):
 
         """
@@ -253,16 +214,13 @@ class DQLearning(object):
 
         self.logger.print_training_header()
         for step in range(self.training_steps):
-
             step_losses = []
             self._gather_experiences()
             for b in range(self.batches):
                 batch = self._sample_experience_batch()
                 for update in range(self.updates_per_batch):
-                    loss = self.calculate_q_loss(batch)
-                    loss.backward()
-                    self.optimizer.step()
-                    self.optimizer.zero_grad()
+                    loss = self.q_estimator.calculate_q_loss(batch)
+                    self.q_estimator.update_q_estimator(loss)
                     step_losses.append(loss.item())
             reward, ep_length = self._validate_learning()
             self.logger.add_training_step(step, 
@@ -272,6 +230,7 @@ class DQLearning(object):
                                           ep_length)
             self.logger.print_training_step()
             self.action_selector.decay_exploration_rate(step, self.training_steps)
+            self.q_estimator.update_second_q_estimator(self.polyak_param)
         self.logger.print_training_footer()
                 
 if __name__ == "__main__":
