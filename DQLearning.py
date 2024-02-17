@@ -53,7 +53,7 @@ class DQLearning(object):
         """
 
         #Set hyperparameters
-        self.training_steps = 600
+        self.training_steps = 400
         self.memory_size = 32768
         self.h = 1024
         self.batches = 8
@@ -61,7 +61,7 @@ class DQLearning(object):
         self.updates_per_batch = 8
 
         self.gamma = 0.9
-        self.learning_rate = 1e-6
+        self.learning_rate = 1e-5
         
         #Read the env
         self.environment = environment
@@ -81,17 +81,18 @@ class DQLearning(object):
                                    self.n_actions).to(self.device)
         optimizer = optim.AdamW(policy_net.parameters(),
                                      lr=self.learning_rate, amsgrad=True)
-        loss_fn = torch.nn.MSELoss()
+        loss_fn = torch.nn.MSELoss().to(self.device)
         update_policy = "polyak"
         self.polyak_param = 0.02
+        variation = "ddqn"
         self.q_estimator = QEstimator(policy_net,
                                       optimizer,
                                       loss_fn,
                                       self.gamma,
                                       self.device,
                                       update_policy,
-                                      target_net
-                                      )
+                                      target_net,
+                                      variation)
         #Prepare the ExpercienceSampler
         self.experience_sampler = ExperienceSampler(self.memory_size)
 
@@ -223,9 +224,10 @@ class DQLearning(object):
                     self.q_estimator.update_q_estimator(loss)
                     step_losses.append(loss.item())
             reward, ep_length = self._validate_learning()
+            expl_rate = self.action_selector.exploration_rate
             self.logger.add_training_step(step, 
-                                          self.action_selector.exploration_rate,
-                                          step_losses,
+                                          expl_rate,
+                                          sum(step_losses) / len(step_losses),
                                           reward,
                                           ep_length)
             self.logger.print_training_step()

@@ -31,23 +31,23 @@ class QEstimator(object):
                  gamma: float = 0.9,
                  device: str = "cpu",
                  update_policy: str = "replace",
-                 second_q_estimator: nn.Module = None
+                 second_q_estimator: nn.Module = None,
+                 variation: str = "ddqn"
                  ):
 
         """
         Constructor of the Q-estimator updater.
         """
 
+        self.device = device
         self.q_estimator = q_estimator
         self.n_actions = self.q_estimator.output_layer.out_features
         self.optimizer = optimizer
         self.loss_fn = loss_fn
-        self.gamma = gamma
-        self.device = device
+        self.gamma = torch.tensor(gamma)
         self.update_policy = update_policy
-        
         self.second_q_estimator = second_q_estimator
-        
+        self.variation = variation
 
     def get_q_target(self, experience: Experience) -> float:
 
@@ -63,7 +63,12 @@ class QEstimator(object):
         if (not experience.done):
             with (torch.no_grad()):
                 if (self.second_q_estimator is not None):
-                    q_target_next = self.second_q_estimator(state).max()
+                    if (self.variation == "ddqn"):
+                        q_tar_idx =\
+                            self.second_q_estimator(state).argmax().item()
+                        q_target_next = self.q_estimator(state)[q_tar_idx]
+                    else:
+                        q_target_next = self.second_q_estimator(state).max()
                 else:
                     q_target_next = self.q_estimator(state).max()
             q_target += self.gamma * q_target_next

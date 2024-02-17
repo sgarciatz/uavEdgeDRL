@@ -1,5 +1,6 @@
 import pandas as pd
 import matplotlib.pyplot as plt
+from torch.utils.tensorboard import SummaryWriter
 
 class TrainLogger(object):
 
@@ -16,6 +17,7 @@ class TrainLogger(object):
         that holds all the information
         """
 
+        self.writer = SummaryWriter()
         columns = ["Training Step",
                    "Exploration Rate",
                    "Loss",
@@ -29,7 +31,7 @@ class TrainLogger(object):
         """
         Inserts a new row into the data DataFrame with the step
         information.
-        
+
         Arguments:
         - step: The number of the current step.
         - loss: The mean loss of the training step.
@@ -44,6 +46,20 @@ class TrainLogger(object):
                "Avg episode reward": reward,
                "Avg episode length": ep_length}
         self.data.append(row)
+
+        self.writer.add_scalar("Exploration Rate / Training Step",
+                          row["Exploration Rate"],
+                          row["Training Step"])
+        self.writer.add_scalar("Loss / Training Step",
+                          row["Loss"],
+                          row["Training Step"])
+        self.writer.add_scalar("Avg episode reward / Training Step",
+                          row["Avg episode reward"],
+                          row["Training Step"])
+        self.writer.add_scalar("Avg episode length / Training Step",
+                          row["Avg episode length"],
+                          row["Training Step"])
+        self.writer.flush()
 
     def print_training_header(self):
 
@@ -65,8 +81,7 @@ class TrainLogger(object):
         
         step_str = str(row["Training Step"]).center(8)
         loss = row["Loss"]
-        step_loss = round(sum(loss) / len(loss), 3)
-        loss_str = str(step_loss).center(8)
+        loss_str = str(round(loss, 3)).center(8)
         expl_rate = row["Exploration Rate"]
         expl_str = round(expl_rate, 5)
         expl_str = str(expl_str).center(11)
