@@ -100,8 +100,8 @@ class DQLearning(object):
         self.start_epsilon = 0.9
         self.end_epsilon = 0.05
         self.decay_rate = 1.2
-#        self.action_policy = EpsilonGreedyPolicy(self.start_epsilon)
-        self.action_policy = BoltzmannPolicy(self.start_epsilon)
+        self.action_policy = EpsilonGreedyPolicy(self.start_epsilon)
+#        self.action_policy = BoltzmannPolicy(self.start_epsilon)
         self.action_selector = ActionSelector(
             self.action_policy,
             decay_strategy = "exponential",
