@@ -40,7 +40,7 @@ class Experience(object):
 
         state = torch.Tensor(self.state.values(), dtype = torch.float64)
         return state
-    
+
     def __str__(self) -> str:
 
         """

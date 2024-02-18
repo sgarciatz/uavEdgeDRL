@@ -53,7 +53,7 @@ class DQLearning(object):
         """
 
         #Set hyperparameters
-        self.training_steps = 400
+        self.training_steps = 5000
         self.memory_size = 32768
         self.h = 1024
         self.batches = 8
@@ -61,7 +61,7 @@ class DQLearning(object):
         self.updates_per_batch = 8
 
         self.gamma = 0.9
-        self.learning_rate = 1e-5
+        self.learning_rate = 0.00001
         
         #Read the env
         self.environment = environment
@@ -82,8 +82,8 @@ class DQLearning(object):
         optimizer = optim.AdamW(policy_net.parameters(),
                                      lr=self.learning_rate, amsgrad=True)
         loss_fn = torch.nn.MSELoss().to(self.device)
-        update_policy = "polyak"
-        self.polyak_param = 0.02
+        update_policy = "replace"
+        self.polyak_param = 50
         variation = "ddqn"
         self.q_estimator = QEstimator(policy_net,
                                       optimizer,
@@ -99,9 +99,9 @@ class DQLearning(object):
         #Prepare the ActionSelector
         self.start_epsilon = 0.9
         self.end_epsilon = 0.05
-        self.decay_rate = 1.0
-        self.action_policy = EpsilonGreedyPolicy(self.start_epsilon)
-#        self.action_policy = BoltzmannPolicy(self.start_epsilon)
+        self.decay_rate = 1.2
+#        self.action_policy = EpsilonGreedyPolicy(self.start_epsilon)
+        self.action_policy = BoltzmannPolicy(self.start_epsilon)
         self.action_selector = ActionSelector(
             self.action_policy,
             decay_strategy = "exponential",
@@ -232,7 +232,8 @@ class DQLearning(object):
                                           ep_length)
             self.logger.print_training_step()
             self.action_selector.decay_exploration_rate(step, self.training_steps)
-            self.q_estimator.update_second_q_estimator(self.polyak_param)
+            if (step % self.polyak_param == 0):
+                self.q_estimator.update_second_q_estimator(self.polyak_param)
         self.logger.print_training_footer()
                 
 if __name__ == "__main__":

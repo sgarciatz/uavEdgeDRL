@@ -53,7 +53,12 @@ if __name__ == "__main__":
     my_exp_sampler = ExperienceSampler(10, sampling_policy = "simple")
     
     for i in range(10):
-        experience = Experience([0,1,2,3,4,5,6,7,8,9], [i], [10], [1+i,2+i,3+i,4+i,5+i,6+i,7+i,8+i,9+i,10+i], False, 8)
+        experience = Experience([0,1,2,3,4,5,6,7,8,9],
+                                [i],
+                                [10],
+                                [1+i,2+i,3+i,4+i,5+i,6+i,7+i,8+i,9+i,10+i],
+                                False,
+                                8)
         my_exp_sampler.add_experience(experience)
         sampled_experience = my_exp_sampler.sample_experience(n=1)
         print("Sampled Experience:")
