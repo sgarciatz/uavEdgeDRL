@@ -21,6 +21,7 @@ class QEstimator(object):
     - loss_fn: The function used to calc the loss.
     - device: The CPU or GPU.
     - update_policy: The policy followed to update the second network.
+    - update_param: The polyak factor or the replace period.
     - second_q_estimator: The second Q-Network for DQL variations
       (target net, Double DQN, Dueling DQN...).
     """
@@ -32,6 +33,7 @@ class QEstimator(object):
                  gamma: float = 0.9,
                  device: str = "cpu",
                  update_policy: str = "replace",
+                 update_param = 50,
                  second_q_estimator: nn.Module = None,
                  variation: str = "ddqn"
                  ):
@@ -42,11 +44,12 @@ class QEstimator(object):
 
         self.device = device
         self.q_estimator = q_estimator
-        self.n_actions = self.q_estimator.output_layer.out_features
+        self.n_actions = self.q_estimator.layer_stack[-1].out_features
         self.optimizer = optimizer
         self.loss_fn = loss_fn
         self.gamma = torch.tensor(gamma)
         self.update_policy = update_policy
+        self.update_param = update_param
         self.second_q_estimator = second_q_estimator
         self.second_q_estimator.load_state_dict(self.q_estimator.state_dict())
         self.variation = variation
@@ -70,15 +73,19 @@ class QEstimator(object):
 
         q_preds = torch.flatten(self.q_estimator(states).gather(1, actions))
         with (torch.no_grad()):
-            if (self.variation == "ddqn"):
-                q_tar_idx = self.second_q_estimator(next_states)\
-                                    .max(dim=1).indices.unsqueeze(dim=1)
+            if (self.second_q_estimator is not None):
+                if (self.variation == "ddqn"):
+                    q_tar_idx = self.second_q_estimator(next_states)\
+                                        .max(dim=1).indices.unsqueeze(dim=1)
+                    q_tar_next = self.q_estimator(next_states)\
+                                        .gather(1, q_tar_idx).flatten()
+                else:
+                    q_tar_next = self.second_q_estimator(next_states)\
+                                            .max(dim=1).values
+            else: 
                 q_tar_next = self.q_estimator(next_states)\
-                                    .gather(1, q_target_idx).flatten()
-            else:
-                q_target_next = self.second_q_estimator(next_states)
-                                        .max(dim=1).values
-        q_tars = rewards + ( dones * self.gamma * q_target_next)
+                                            .max(dim=1).values
+        q_tars = rewards + ( dones * self.gamma * q_tar_next)
         loss = self.loss_fn(q_preds, q_tars)
         return loss
 
@@ -94,21 +101,26 @@ class QEstimator(object):
         self.optimizer.step()
         self.optimizer.zero_grad()
 
-    def update_second_q_estimator(self, polyak_param) -> None:
+    def update_second_q_estimator(self, step) -> None:
 
         """
         Updates the secondary q estimator (polyak or replace).
+        
+        Parameters:
+        - step: the current step of the training.
         """
+
         if (self.second_q_estimator is None):
             return
-        if (self.update_policy == "replace"):
+        if (self.update_policy == "replace"\
+            and step % self.update_param == 0):
             self.second_q_estimator\
                     .load_state_dict(self.q_estimator.state_dict())
         if (self.update_policy == "polyak"):
             q_dict = self.q_estimator.state_dict()
             second_q_dict = self.second_q_estimator.state_dict()
             for key in q_dict:
-                second_q_dict[key] = q_dict[key]*polyak_param\
-                                     + second_q_dict[key]*(1-polyak_param)
+                second_q_dict[key] = q_dict[key]*self.update_param\
+                     + second_q_dict[key]*(1-self.update_param)
             self.second_q_estimator.load_state_dict(second_q_dict)
 

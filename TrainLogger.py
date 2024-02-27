@@ -6,23 +6,30 @@ class TrainLogger(object):
 
 
     """
-    TrainLogger is responsable of outputting information about the 
+    TrainLogger is responsable of outputting information about the
     training process in a human-readable format.
+
+    Attributes:
+    -writer: The object responsible to write information into
+      the TensorBoard.
+    -data: the list that contains the information that is generated
+      during training.
     """
 
-    def __init__(self):
+    def __init__(self, training_name, experiment_info):
 
         """
         Constructor of the TrainLogger object, it creates the DataFrame
-        that holds all the information
-        """
+        that holds all the information.
 
-        self.writer = SummaryWriter()
-        columns = ["Training Step",
-                   "Exploration Rate",
-                   "Loss",
-                   "Avg episode reward",
-                   "Avg episode length"]
+        Parameters:
+        -training_name: the id of the training used to name the
+          directory.
+        -experiment_info: a summary of the training parameters.
+        """
+        output_dir = f"runs/{training_name}"
+        self.writer = SummaryWriter(log_dir=output_dir)
+        self.writer.add_text("run_params", experiment_info)
         self.data = []
 
 

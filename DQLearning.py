@@ -12,7 +12,6 @@ from ActionSelector import ActionSelector
 from Experience import Experience
 from EpsilonGreedyPolicy import EpsilonGreedyPolicy
 from BoltzmannPolicy import BoltzmannPolicy
-from TrainLogger import TrainLogger
 import numpy as np
 import random
 
@@ -21,17 +20,17 @@ class DQLearning(object):
 
 
     """
-    This class represents the DQN agent and holds all the 
+    This class represents the DQN agent and holds all the
     hyperparameters relative to the training process.
-    
+
     Attributes:
     - max_episodes: the number of episodes of the training phase.
     - batch_size: is the number of transitions sampled from the replay
        buffer. B
     - gamma: is the temporal discount factor. γ
-    - exploration_start: holds the start value of ε for the ε-greedy 
+    - exploration_start: holds the start value of ε for the ε-greedy
      policy.
-    - exploration_end: holds the final value of ε for the ε-greedy 
+    - exploration_end: holds the final value of ε for the ε-greedy
      policy.
     - exploration_decay: controls the rate of exploration decay. Higher
      means a slower decay.
@@ -41,76 +40,35 @@ class DQLearning(object):
     """
 
 
-    def __init__(self, environment):
+    def __init__(self, parameters):
 
-        """ 
+        """
         Initialize the agent using the characteristic of the environment
         and load the training hyperparameters.
-        
+
         Arguments:
-        - environment: the instance of the environment where the agent
-         lives.
+        - parameters: the dictionary with all the information relevant
+          for training.
         """
 
         #Set hyperparameters
-        self.training_steps = 5000
-        self.memory_size = 32768
-        self.h = 1024
-        self.batches = 8
-        self.batch_size = 128
-        self.updates_per_batch = 8
-
-        self.gamma = 0.9
-        self.learning_rate = 0.00001
-        
-        #Read the env
-        self.environment = environment
-        self.n_actions = self.environment.action_space.n
-        self.n_observations =\
-            flatten_space(self.environment.observation_space).shape[0]
+        self.training_steps = parameters["training_steps"]
+        self.h = parameters["h"]
+        self.batches = parameters["batches"]
+        self.batch_size = parameters["batch_size"]
+        self.updates_per_batch = parameters["updates_per_batch"]
 
         #Set the device for torch
-        self.device = torch.device("cpu")
-        if (torch.cuda.is_available()):
-            self.device = torch.device("cuda")
+        self.device = parameters["device"]
 
-        #Prepare the QEstimator
-        policy_net = QNetwork(self.n_observations,
-                                   self.n_actions).to(self.device)
-        target_net = QNetwork(self.n_observations,
-                                   self.n_actions).to(self.device)
-        optimizer = optim.AdamW(policy_net.parameters(),
-                                     lr=self.learning_rate, amsgrad=True)
-        loss_fn = torch.nn.MSELoss().to(self.device)
-        update_policy = "replace"
-        self.polyak_param = 50
-        variation = "ddqn"
-        self.q_estimator = QEstimator(policy_net,
-                                      optimizer,
-                                      loss_fn,
-                                      self.gamma,
-                                      self.device,
-                                      update_policy,
-                                      target_net,
-                                      variation)
-        #Prepare the ExpercienceSampler
-        self.experience_sampler = ExperienceSampler(self.memory_size)
-
-        #Prepare the ActionSelector
-        self.start_epsilon = 0.9
-        self.end_epsilon = 0.05
-        self.decay_rate = 1.2
-        self.action_policy = EpsilonGreedyPolicy(self.start_epsilon)
-#        self.action_policy = BoltzmannPolicy(self.start_epsilon)
-        self.action_selector = ActionSelector(
-            self.action_policy,
-            decay_strategy = "exponential",
-            start_exploration_rate = self.start_epsilon,
-            end_exploration_rate = self.end_epsilon,
-            decay_rate = self.decay_rate)
+        # Set Components
+        self.environment = parameters["env"]
+        self.q_estimator = parameters["q_estimator"]
+        self.experience_sampler = parameters["memory"]
+        self.action_selector = parameters["action_selector"]
 
         #Prepare the logging class TrainLogger
-        self.logger = TrainLogger()
+        self.logger = parameters["logger"]
 
     def _flatten_state(self, state) -> list:
 
@@ -130,13 +88,12 @@ class DQLearning(object):
     def _gather_experiences(self):
 
         """
-        Using the inicial policy (policy_net), fill the replay memory
+        Using the current policy (policy_net), fill the replay memory
         buffer. This is the first step of the loop of the DQN
         Algorithm.
-        """ 
+        """
 
         n_experiences = self.h
-        
         done = True
         experience = None
         for i in range(n_experiences):
@@ -153,9 +110,9 @@ class DQLearning(object):
             next_state, reward, terminated, truncated, info =\
                 self.environment.step(action)
             done = terminated or truncated
-            experience = Experience(state, action, reward, next_state, done, 9999)  
+            experience = Experience(state, action, reward, next_state, done, 9999)
             self.experience_sampler.add_experience(experience)
-    
+
     def _validate_learning(self):
 
         """
@@ -165,6 +122,7 @@ class DQLearning(object):
 
         rewards = []
         ep_lengths = []
+        self.environment.reset(seed=0)
         for _ in range(10):
             done = False
             ep_length = 0
@@ -201,7 +159,7 @@ class DQLearning(object):
         """
         The maing training loop of the DQN agent. The training consists
         of the execution of the following steps:
-        
+
         For each step of training:
             generate h experiences with the current policy
             gather B batches, For each bacth:
@@ -225,17 +183,17 @@ class DQLearning(object):
                     step_losses.append(loss.item())
             reward, ep_length = self._validate_learning()
             expl_rate = self.action_selector.exploration_rate
-            self.logger.add_training_step(step, 
+            self.logger.add_training_step(step,
                                           expl_rate,
                                           sum(step_losses) / len(step_losses),
                                           reward,
                                           ep_length)
             self.logger.print_training_step()
-            self.action_selector.decay_exploration_rate(step, self.training_steps)
-            if (step % self.polyak_param == 0):
-                self.q_estimator.update_second_q_estimator(self.polyak_param)
+            self.action_selector.decay_exploration_rate(step,
+                                                        self.training_steps)
+            self.q_estimator.update_second_q_estimator(step)
         self.logger.print_training_footer()
-                
+
 if __name__ == "__main__":
     import gymnasium as gym
     import gym_network

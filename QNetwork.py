@@ -11,37 +11,41 @@ class QNetwork(nn.Module):
     """
 
 
-    def __init__(self, n_observations, n_actions):
+    def __init__(self, n_observations, n_actions, layers):
 
         """
         Create the NN stacking the layers.
-        
+
         Arguments:
         - n_observations: the number of observations and size of the
                           input layer.
         - n_actions: the number of differenct actions and the size of
                      the output layer
+        - layers: a list with the number of Linear layers and their
+          number of neurons.
         """
 
         super(QNetwork, self).__init__()
-        self.input_layer = nn.Linear(n_observations, 128)
-        self.hidden_layer = nn.Linear(self.input_layer.out_features,
-                                      128)
-        self.output_layer = nn.Linear(self.hidden_layer.out_features,
+        input_layer = nn.Linear(n_observations, layers[0])
+        output_layer = nn.Linear(layers[-1],
                                       n_actions)
-
+        hidden_layers = []
+        for layer in layers[1:-1]:
+            hidden_layers.append(nn.Linear(layer[0], layer[1]))
+            hidden_layers.append(nn.ReLU())
         self.layer_stack = nn.Sequential(
-            self.input_layer,
+            input_layer,
             nn.ReLU(),
-            self.hidden_layer,
-            nn.ReLU(),
-            self.output_layer
-        )
+            *hidden_layers,
+            output_layer)
 
     def forward(self, x):
 
         """
         Feed input data into the Q-Network
+
+        Parameters:
+        - x: A minibatch of states.
         """
 
         logits = self.layer_stack(x)
