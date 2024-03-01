@@ -15,6 +15,7 @@ import numpy as np
 import torch
 import gym_network
 
+
 class ConfigurationLoader(object):
 
 
@@ -186,8 +187,13 @@ class ConfigurationLoader(object):
         config = self.configuration["hyperparameters"]["memory"]
         memory_type = config["type"]
         memory_size = config["memory_size"]
-
-        memory = ExperienceSampler(memory_size, memory_type)
+        epsilon = config["epsilon"]
+        alpha = config["alpha"]
+        memory = ExperienceSampler(memory_size,
+                                   memory_type,
+                                   self.device,
+                                   epsilon,
+                                   alpha)
         return memory
 
     def get_parameters(self) -> dict:

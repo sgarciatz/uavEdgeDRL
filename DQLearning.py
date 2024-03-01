@@ -110,7 +110,7 @@ class DQLearning(object):
             next_state, reward, terminated, truncated, info =\
                 self.environment.step(action)
             done = terminated or truncated
-            experience = Experience(state, action, reward, next_state, done, 9999)
+            experience = Experience(state, action, reward, next_state, done, 99)
             self.experience_sampler.add_experience(experience)
 
     def _validate_learning(self):
@@ -178,8 +178,11 @@ class DQLearning(object):
             for b in range(self.batches):
                 batch = self._sample_experience_batch()
                 for update in range(self.updates_per_batch):
-                    loss = self.q_estimator.calculate_q_loss(batch)
+                    loss, td_error = self.q_estimator.calculate_q_loss(batch)
                     self.q_estimator.update_q_estimator(loss)
+                    self.experience_sampler.update_batch_priorities(
+                        batch,
+                        td_error)
                     step_losses.append(loss.item())
             reward, ep_length = self._validate_learning()
             expl_rate = self.action_selector.exploration_rate

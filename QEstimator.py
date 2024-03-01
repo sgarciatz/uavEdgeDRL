@@ -89,7 +89,8 @@ class QEstimator(object):
                                             .max(dim=1).values
         q_tars = rewards + ( dones * self.gamma * q_tar_next)
         loss = self.loss_fn(q_preds, q_tars)
-        return loss
+        td_error = torch.abs(q_tars - q_preds)
+        return loss, td_error
 
     def update_q_estimator(self, loss) -> None:
 
