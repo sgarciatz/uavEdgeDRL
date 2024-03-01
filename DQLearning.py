@@ -14,7 +14,7 @@ from EpsilonGreedyPolicy import EpsilonGreedyPolicy
 from BoltzmannPolicy import BoltzmannPolicy
 import numpy as np
 import random
-
+import sys
 
 class DQLearning(object):
 
@@ -98,10 +98,10 @@ class DQLearning(object):
         experience = None
         for i in range(n_experiences):
             if (done):
-                state, info = self.environment.reset()
+                seed = random.randint(0, sys.maxsize)
+                state, info = self.environment.reset(seed=seed)
             else:
                 state = next_state
-
 #            raw_state = torch.Tensor(self._flatten_state(state))
             raw_state = torch.Tensor(state).to(self.device)
             with (torch.no_grad()):

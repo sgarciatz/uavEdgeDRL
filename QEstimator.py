@@ -51,7 +51,9 @@ class QEstimator(object):
         self.update_policy = update_policy
         self.update_param = update_param
         self.second_q_estimator = second_q_estimator
-        self.second_q_estimator.load_state_dict(self.q_estimator.state_dict())
+        if (self.second_q_estimator is not None):
+            self.second_q_estimator.load_state_dict(
+                self.q_estimator.state_dict())
         self.variation = variation
 
     def calculate_q_loss(self, batch):
