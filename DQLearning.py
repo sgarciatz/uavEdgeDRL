@@ -196,6 +196,7 @@ class DQLearning(object):
                                                         self.training_steps)
             self.q_estimator.update_second_q_estimator(step)
         self.logger.print_training_footer()
+        self.q_estimator.pickle_model()
 
 if __name__ == "__main__":
     import gymnasium as gym

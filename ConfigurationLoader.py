@@ -1,3 +1,4 @@
+import os
 import random
 import json
 import argparse
@@ -138,6 +139,9 @@ class ConfigurationLoader(object):
         if (variation == "ddqn" or variation == "target"):
             target_net = QNetwork(n_obs, n_act, layers)
             target_net.load_state_dict(policy_net.state_dict())
+        if (not os.path.exists("models")):
+            os.makedirs("models")
+        output_path = "models/" + self.configuration["id"] + ".pt"
         q_estimator = QEstimator(policy_net,
                                  optim,
                                  loss_fn,
@@ -146,7 +150,8 @@ class ConfigurationLoader(object):
                                  update_policy,
                                  update_param,
                                  target_net,
-                                 variation)
+                                 variation,
+                                 output_path)
         return q_estimator
 
     def get_action_selector(self) -> ActionSelector:

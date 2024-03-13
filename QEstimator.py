@@ -35,7 +35,8 @@ class QEstimator(object):
                  update_policy: str = "replace",
                  update_param = 50,
                  second_q_estimator: nn.Module = None,
-                 variation: str = "ddqn"
+                 variation: str = "ddqn",
+                 output_path: str = "models/modelito.pt"
                  ):
 
         """
@@ -55,6 +56,7 @@ class QEstimator(object):
             self.second_q_estimator.load_state_dict(
                 self.q_estimator.state_dict())
         self.variation = variation
+        self.output_path = output_path
 
     def calculate_q_loss(self, batch):
 
@@ -133,4 +135,23 @@ class QEstimator(object):
                 second_q_dict[key] = q_dict[key]*self.update_param\
                      + second_q_dict[key]*(1-self.update_param)
             self.second_q_estimator.load_state_dict(second_q_dict)
+
+    def pickle_model(self):
+
+        """Pickle the resulting model."""
+
+        if (self.second_q_estimator is not None):
+            torch.save(self.second_q_estimator.state_dict(),
+                       self.output_path)
+        else:
+            torch.save(self.q_estimator.state_dict(),
+                       self.output_path)
+
+    def load_model(self):
+
+        """Load model from file."""
+
+        self.second_q_estimator = None
+        self.q_estimator = torch.load_state_dict(
+                               torch.load(self.output_path))
 
