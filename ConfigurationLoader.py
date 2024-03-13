@@ -91,15 +91,11 @@ class ConfigurationLoader(object):
         elif (optim_id == "adam"):
             optimizer = torch.optim.Adam(policy_net.parameters(),
                                          lr=learning_rate,
-                                         amsgrad=True,
-                                         foreach=True,
-                                         fused=True)
+                                         amsgrad=True)
         else:
             optimizer = torch.optim.AdamW(policy_net.parameters(),
                                           lr=learning_rate,
-                                          amsgrad=True,
-                                          foreach=True,
-                                          fused=True)
+                                          amsgrad=True)
         return optimizer
 
     def get_loss_fn(self, loss_fn_id):
