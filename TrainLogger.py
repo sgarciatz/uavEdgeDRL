@@ -93,7 +93,7 @@ class TrainLogger(object):
         expl_str = round(expl_rate, 5)
         expl_str = str(expl_str).center(11)
         reward = row["Avg episode reward"]
-        reward_str = str(reward).center(11)
+        reward_str = str(round(reward, 5)).center(11)
         ep_length = row["Avg episode length"]
         ep_length_str = str(ep_length).center(11)
         print(f"║{step_str}║{expl_str}║{loss_str}"\

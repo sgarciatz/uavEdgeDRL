@@ -7,5 +7,5 @@ setup(
                       "networkx==3.2.1",
                       "numpy==1.26.3",
                       "perlin-noise==1.12",
-                      "torch==2.2.0+cu118"],
+                      "torch==2.2.0"],
 )

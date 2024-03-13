@@ -52,20 +52,27 @@ class UAV(object):
     def deployMicroservice(self, ms: Microservice, msIndex: int) -> bool:
 
         """Deploy a microservice if it fits"""
+
+        if (self.ms_fits(ms, msIndex)):
+            self.ramAllocated += ms.ramRequirement
+            self.cpuAllocated += ms.cpuRequirement
+            self.microservices[msIndex] = 1
+            return True
+        else:
+            return False
+
+
+    def ms_fits(self, ms: Microservice, msIndex: int) -> bool:
+
         ramRemaining: float = \
             self.ramCapacity - (self.ramAllocated + ms.ramRequirement)
         cpuRemaining: float = \
             self.cpuCapacity - (self.cpuAllocated + ms.cpuRequirement)
-        if (ramRemaining < 0):
+        if ((ramRemaining < 0) or (cpuRemaining < 0)):
             return False
-        if (cpuRemaining < 0):
-            return False
-        self.ramAllocated += ms.ramRequirement
-        self.cpuAllocated += ms.cpuRequirement
-        self.microservices[msIndex] = 1
+        else:
+            return True
 
-        return True 
-            
     def __str__(self) -> str:
         output =   f'UAV id: {self.id}'\
                  + f'\n\t-Position: {self.position}'\

@@ -100,7 +100,14 @@ class QEstimator(object):
         """
 
         loss.backward()
-        
+        if (self.second_q_estimator is not None):
+            nn.utils.clip_grad_norm_(
+                self.second_q_estimator.layer_stack.parameters(),
+                1.0)
+        else:
+            nn.utils.clip_grad_norm_(
+                self.q_estimator.layer_stack.parameters(),
+                1.0)
         self.optimizer.step()
         self.optimizer.zero_grad()
 
