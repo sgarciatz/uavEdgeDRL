@@ -113,7 +113,7 @@ class DQLearning(object):
             experience = Experience(state, action, reward, next_state, done, 99)
             self.experience_sampler.add_experience(experience)
 
-    def _validate_learning(self):
+    def validate_learning(self):
 
         """
         Use the Q estimator network with its current weights to check
@@ -184,7 +184,7 @@ class DQLearning(object):
                         batch,
                         td_error)
                     step_losses.append(loss.item())
-            reward, ep_length = self._validate_learning()
+            reward, ep_length = self.validate_learning()
             expl_rate = self.action_selector.exploration_rate
             self.logger.add_training_step(step,
                                           expl_rate,

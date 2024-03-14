@@ -140,18 +140,12 @@ class QEstimator(object):
 
         """Pickle the resulting model."""
 
-        if (self.second_q_estimator is not None):
-            torch.save(self.second_q_estimator.state_dict(),
-                       self.output_path)
-        else:
-            torch.save(self.q_estimator.state_dict(),
-                       self.output_path)
+        torch.save(self.q_estimator.state_dict(), self.output_path)
 
     def load_model(self):
 
         """Load model from file."""
 
         self.second_q_estimator = None
-        self.q_estimator = torch.load_state_dict(
-                               torch.load(self.output_path))
+        self.q_estimator.load_state_dict(torch.load(self.output_path))
 

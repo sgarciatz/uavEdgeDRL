@@ -74,7 +74,7 @@ class ConfigurationLoader(object):
         env_params = None
         if ("params" in config):
             env_params = config["params"]
-            self.env = gym.make(env_name)
+            self.env = gym.make(env_name)#, render_mode="human")
             return
         self.env = gym.make(env_name)
 
@@ -251,6 +251,7 @@ def main(args):
     torch.manual_seed(0)
     agent = ConfigurationLoader(args).get_agent()
     agent.train()
-
+#    agent.q_estimator.load_model()
+#    agent.validate_learning()
 if __name__ == "__main__":
     main(parse_arguments())
