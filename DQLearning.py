@@ -113,17 +113,23 @@ class DQLearning(object):
             experience = Experience(state, action, reward, next_state, done, 99)
             self.experience_sampler.add_experience(experience)
 
-    def validate_learning(self):
+    def validate_learning(self, n_validations: int , testing: bool = False):
 
-        """
-        Use the Q estimator network with its current weights to check
-        how well the agent performs in a enviroment during an episode.
+        """Use the Q estimator network with its current weights to
+        check how well the agent performs in a enviroment during an
+        episode.
+
+        Parameters:
+        - n_validations: int = The number of episodes to execute.
         """
 
         rewards = []
         ep_lengths = []
-        self.environment.reset(seed=0)
-        for _ in range(10):
+        if (testing):
+            self.environment.reset(testing = True)
+        else:
+            self.environment.reset(seed=0)
+        for _ in range(n_validations):
             done = False
             ep_length = 0
             ep_reward = 0
@@ -143,7 +149,7 @@ class DQLearning(object):
                 ep_reward += reward
             rewards.append(ep_reward)
             ep_lengths.append(ep_length)
-        return sum(rewards) / 10, sum(ep_lengths) / 10
+        return sum(rewards) / n_validations, sum(ep_lengths) / n_validations
 
     def _sample_experience_batch(self):
 
@@ -184,7 +190,7 @@ class DQLearning(object):
                         batch,
                         td_error)
                     step_losses.append(loss.item())
-            reward, ep_length = self.validate_learning()
+            reward, ep_length = self.validate_learning(10)
             expl_rate = self.action_selector.exploration_rate
             self.logger.add_training_step(step,
                                           expl_rate,

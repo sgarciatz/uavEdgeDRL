@@ -31,6 +31,7 @@ class NetworkEnv(gym.Env):
         self.microservices = []
         self.msToDeploy = []
         self.worstCaseSolution = 0
+        self.input_file = input_file
         self.build_env(input_file)
         self.build_observation_space()
         self.build_action_space()
@@ -121,13 +122,15 @@ class NetworkEnv(gym.Env):
         """
         Get the reward of the end of the episode.
         
-        reward = (1 - s/w_s)^τ
+        reward = (1 - s/w_s) * p
         """
         
         extra_steps = self.episode_step - len(self.msToDeploy)
         extra_steps_penalty = math.pow(0.95, extra_steps)
-        currentSolution = self.network_graph.get_total_cost()
-        reward = math.pow(1 - (currentSolution / self.worstCaseSolution), math.pi) * extra_steps_penalty
+        current_solution = self.network_graph.get_total_cost()
+        reward = (1 - (current_solution / self.worstCaseSolution)) \
+                 * extra_steps_penalty
+        #print("extra_steps_penalty:", extra_steps_penalty, "current_solution", current_solution, "self.worstCaseSolution", self.worstCaseSolution, "reward", reward)
         return reward
         
         
@@ -140,7 +143,7 @@ class NetworkEnv(gym.Env):
         The microservices are read first to know the maximum size of
         the lists in the UAVs.
         """
-        
+
         inputData = json.load(open(input_file))
         msList: list[Microservice] = []
         for ms in inputData['microserviceList']:
@@ -154,7 +157,7 @@ class NetworkEnv(gym.Env):
 
         self._reset_deployment_queue()
         
-        self.network_graph = NetworkGraph(inputData['uavList'], 
+        self.network_graph = NetworkGraph(inputData['uavList'],
                                           self.microservices)
 
     def build_action_space(self):
@@ -190,7 +193,7 @@ class NetworkEnv(gym.Env):
             seed=42)
         self.observation_space = gym.spaces.utils.flatten_space(self.observation_space)
 
-    def reset(self, seed=None, options=None):
+    def reset(self, seed=None, options=None, testing: bool = False):
         """
         Deallocate all resources in the UAVs. Generate new random
         heatmaps for each microservice. Reset the deployment queue.
@@ -198,9 +201,13 @@ class NetworkEnv(gym.Env):
         """
         
         super().reset(seed=seed)
+
         self.episode_step = 0
-        self.network_graph.reset()
-        self._reset_deployment_queue()
+        if (testing):
+            self.build_env(self.input_file)
+        else:
+            self.network_graph.reset()
+            self._reset_deployment_queue()
         self.worstCaseSolution = self.network_graph.get_total_cost()
         observation = self._get_obs()
         info = {}
@@ -227,13 +234,16 @@ class NetworkEnv(gym.Env):
         msIndex = self.microservices.index(ms)
         dstUav = list(self.network_graph.graph.nodes)[action]
         is_deployed = dstUav.deployMicroservice(ms, msIndex)
+        reward = 0
         if (is_deployed):
             self.network_graph.calculate_serving_cost(msIndex)
         else:
             self._reinsert_deployment_queue(ms)
+            reward = -1.0
+
         observation = self._get_obs()
         terminated = False
-        reward = 0
+
         self.episode_step += 1
         if (self.msToDeploy[0].id == "empty"): 
             terminated = True
@@ -245,10 +255,9 @@ class NetworkEnv(gym.Env):
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
 
-    myEnv = NetworkEnv('/home/santiago/Downloads/paper2_large_01.json')
+    myEnv = NetworkEnv('/home/santiago/Documents/Trabajo/Workspace/GLOMIM/glomim_v1/InputScenarios/test_scenario.json')
     observation, info = myEnv.reset()
     steps = len(myEnv.msToDeploy)
     for index in range(steps):
-        obs, reward, terminated, truncated, info = myEnv.step(index*3)
+        obs, reward, terminated, truncated, info = myEnv.step(index+2)
 
-        
