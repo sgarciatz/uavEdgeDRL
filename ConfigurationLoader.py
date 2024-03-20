@@ -74,7 +74,7 @@ class ConfigurationLoader(object):
         env_params = None
         if ("params" in config):
             env_params = config["params"]
-            self.env = gym.make(env_name)#, render_mode="human")
+            self.env = gym.make(env_name, input_file=env_params)#, render_mode="human")
             return
         self.env = gym.make(env_name)
 
@@ -245,13 +245,86 @@ def parse_arguments ():
     args = args_parser.parse_args()
     return args.Filename[0]
 
+def show_validation(env):
+
+    """ Once a validation is carried out, show the deployment scheme.
+
+    Parameters:
+    - env = The environment.
+    """
+
+    import matplotlib.pyplot as plt
+    import networkx as nx
+
+    G = env.network_graph.graph
+    deployment_schme = plt.figure(figsize=(7,7))
+    plt.xticks([])
+    plt.yticks([])
+
+    # Show the deployment scheme and all the heatmaps.
+
+    xMax = max([node.position[0] for node in G])
+    positions_dict = {}
+    for node in G:
+        positions_dict[node] = [node.position[1], xMax - node.position[0]]
+
+    colors = []
+    for index in range(len(list(G.nodes)[0].microservices)):
+         colors.append([node.microservices[index] * (index + 1) for node in G])
+    colors = np.sum(colors, axis=0)
+    print(colors)
+    nx.draw_networkx(G,
+                     pos=positions_dict, 
+                     node_color=colors,
+                     cmap="Pastel1",
+                     with_labels=False)
+
+    heatmaps = plt.figure(figsize=(7,7))
+    plt.xticks([])
+    plt.yticks([])
+    fig, axes = plt.subplots(nrows=2, ncols=2)
+    ax = axes.flatten()
+    for ms_index in range(len(list(G.nodes)[0].microservices)):
+        colors = [uav.microservicesHeat[ms_index] for uav in G]
+        nx.draw_networkx(G,
+                         pos=positions_dict,
+                         node_color=colors,
+                         cmap="inferno",
+                         vmin=0,
+                         vmax=5,
+                         with_labels=False,
+                         ax=ax[ms_index])
+
+    vmin, vmax = 0, 5
+    sm = plt.cm.ScalarMappable(cmap="inferno", 
+                               norm=plt.Normalize(vmin=vmin, vmax=vmax))
+    sm.set_array([])
+    plt.colorbar(sm, ax=ax)
+    plt.show()
+
+def print_validation(env):
+
+    G = env.network_graph.graph
+    heatmaps = []
+    deployment = []
+
+    cost_fn_value = 0
+    for uav in G:
+        print(uav)
+        for cost in uav.microservicesCosts:
+            cost_fn_value += cost
+
 def main(args):
     random.seed(0)
     np.random.seed(0)
     torch.manual_seed(0)
     agent = ConfigurationLoader(args).get_agent()
     agent.train()
-#    agent.q_estimator.load_model()
-#    agent.validate_learning()
+    
+    agent.q_estimator.load_model()
+    agent.validate_learning(1, testing = True)
+    show_validation(agent.environment)
+    print_validation(agent.environment)
+
 if __name__ == "__main__":
     main(parse_arguments())
