@@ -79,11 +79,11 @@ class NetworkEnv(gym.Env):
         return np.concatenate((uav_observation, ms_observation), dtype=np.int32)
 
     def _reset_deployment_queue(self):
-        
+
         """
         Reset the queue of deployment of microservices.
         """
-        
+
         self.msToDeploy = []
         msListCopy = copy.deepcopy(self.microservices)
         done = False
@@ -108,7 +108,7 @@ class NetworkEnv(gym.Env):
     def _reinsert_deployment_queue(self, ms: Microservice) -> None:
 
         """Reinsert a microservice that could not be deployed.
-        
+
         Arguments:
         - ms: Microservice = The microservice that could not be
             deployed and are going to be reinserted.
@@ -118,28 +118,28 @@ class NetworkEnv(gym.Env):
         self.msToDeploy.pop(-1)
 
     def _get_reward(self) -> float:
-    
+
         """
         Get the reward of the end of the episode.
-        
+
         reward = (1 - s/w_s) * p
         """
-        
+
         extra_steps = self.episode_step - len(self.msToDeploy)
         extra_steps_penalty = math.pow(0.95, extra_steps)
         current_solution = self.network_graph.get_total_cost()
-        reward = (1 - (current_solution / self.worstCaseSolution)) \
+        solution_ratio = current_solution / self.worstCaseSolution
+        reward = (1 - math.pow(solution_ratio, 3)) \
                  * extra_steps_penalty
         #print("extra_steps_penalty:", extra_steps_penalty, "current_solution", current_solution, "self.worstCaseSolution", self.worstCaseSolution, "reward", reward)
         return reward
-        
-        
+
     def build_env(self, input_file):
 
         """
         Read the configuration from a file and load it to a NetworkX
         graph.
-        
+
         The microservices are read first to know the maximum size of
         the lists in the UAVs.
         """
@@ -156,27 +156,28 @@ class NetworkEnv(gym.Env):
                                     key=lambda ms: ms.replicationIndex)
 
         self._reset_deployment_queue()
-        
+
         self.network_graph = NetworkGraph(inputData['uavList'],
                                           self.microservices)
 
     def build_action_space(self):
 
-        """
-        
+        """Create the action space, the seed is not really important
+        because it is used for sampling randomly.
         """
 
         self.action_space = Discrete(len(self.network_graph.graph),
-                                     start=0, 
+                                     start=0,
                                      seed=42)
 
     def build_observation_space(self):
 
-        """
-        
+        """Create the observation space of the agent. It is composed of
+        the data that the UAV swarm provides and the queue of
+        microservices to deploy.
         """
 
-        uav_obs_length = len(self.network_graph.graph.nodes) 
+        uav_obs_length = len(self.network_graph.graph.nodes)
         uav_obs_length *= (len(self.microservices) + 1)
 
         uav_observation = Box(low=0,
@@ -184,10 +185,10 @@ class NetworkEnv(gym.Env):
                               shape=(uav_obs_length,),
                               dtype= np.intc)
         ms_queue_observation = Box(low=-1,
-                                    high= len(self.microservices) - 1,
+                                    high= len(self.microservices),
                                     shape=(len(self.msToDeploy),),
                                     dtype=np.intc)
-        
+
         self.observation_space = Tuple(
             (uav_observation, ms_queue_observation),
             seed=42)
@@ -199,7 +200,7 @@ class NetworkEnv(gym.Env):
         heatmaps for each microservice. Reset the deployment queue.
         Calculate the worst possible solution.
         """
-        
+
         super().reset(seed=seed)
 
         self.episode_step = 0

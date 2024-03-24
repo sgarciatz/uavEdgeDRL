@@ -117,7 +117,7 @@ class QEstimator(object):
 
         """
         Updates the secondary q estimator (polyak or replace).
-        
+
         Parameters:
         - step: the current step of the training.
         """
