@@ -5,6 +5,7 @@ import argparse
 from pathlib import Path
 from QEstimator import QEstimator
 from QNetwork import QNetwork
+from QDuelingNetwork import QDuelingNetwork
 from ExperienceSampler import ExperienceSampler
 from ActionSelector import ActionSelector
 from TrainLogger import TrainLogger
@@ -79,7 +80,9 @@ class ConfigurationLoader(object):
         self.env = gym.make(env_name)
 
 
-    def get_optimizer(self, optim_id, policy_net, learning_rate) -> torch.optim.Optimizer:
+    def get_optimizer(self, 
+                      optim_id, policy_net,
+                      learning_rate) -> torch.optim.Optimizer:
 
         """
         Maps a configuration parameter to a PyTorch optimizer.
@@ -119,11 +122,25 @@ class ConfigurationLoader(object):
         Given the configuration loaded, create and return a QEstimator.
         """
 
-        n_obs = gym.spaces.utils.flatten_space(self.env.observation_space).shape[0]
-        n_act = gym.spaces.utils.flatten_space(self.env.action_space).shape[0]
+        n_obs = gym.spaces.utils.flatten_space(
+                    self.env.observation_space).shape[0]
+        n_act = gym.spaces.utils.flatten_space(
+                    self.env.action_space).shape[0]
         config = self.configuration["hyperparameters"]["q_estimator"]
+        network_type = "dueling"
+        if ("type" in config):
+            network_type = config["type"]
         layers = config["layers"]
-        policy_net = QNetwork(n_obs, n_act, layers)
+        if (network_type == "dueling"):
+            policy_net = QDuelingNetwork(n_obs,
+                                         n_act,
+                                         layers,
+                                         device = self.device)
+        elif (network_type == "simple"):
+            policy_net = QNetwork(n_obs,
+                                  n_act,
+                                  layers,
+                                  device = self.device)
         optim_id = config["optimizer"]
         learning_rate = config["learning_rate"]
         optim = self.get_optimizer(optim_id,
@@ -137,7 +154,16 @@ class ConfigurationLoader(object):
         variation = self.configuration["variation"]
         target_net = None
         if (variation == "ddqn" or variation == "target"):
-            target_net = QNetwork(n_obs, n_act, layers)
+            if (network_type == "dueling"):
+                target_net = QDuelingNetwork(n_obs,
+                                             n_act,
+                                             layers,
+                                             device = self.device)
+            elif (network_type == "simple"):
+                target_net = QNetwork(n_obs,
+                                      n_act,
+                                      layers,
+                                      device = self.device)
             target_net.load_state_dict(policy_net.state_dict())
         if (not os.path.exists("models")):
             os.makedirs("models")

@@ -45,7 +45,7 @@ class QEstimator(object):
 
         self.device = device
         self.q_estimator = q_estimator
-        self.n_actions = self.q_estimator.layer_stack[-1].out_features
+        self.n_actions = self.q_estimator.n_actions
         self.optimizer = optimizer
         self.loss_fn = loss_fn
         self.gamma = torch.tensor(gamma)

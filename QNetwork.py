@@ -11,21 +11,26 @@ class QNetwork(nn.Module):
     """
 
 
-    def __init__(self, n_observations, n_actions, layers):
+    def __init__(self,
+                 n_observations: int,
+                 n_actions: int,
+                 layers: list,
+                 device: str = "cpu"):
 
-        """
-        Create the NN stacking the layers.
+        """Create the NN stacking the layers.
 
         Arguments:
-        - n_observations: the number of observations and size of the
-                          input layer.
-        - n_actions: the number of differenct actions and the size of
-                     the output layer
+        - n_observations: int = the number of observations and size of
+          the input layer.
+        - n_actions: int = the number of differenct actions and the
+          size of the output layer.
         - layers: a list with the number of Linear layers and their
           number of neurons.
+        - device: str = the device for pytorch (cupda or cpu).
         """
 
         super(QNetwork, self).__init__()
+        self.n_actions = n_actions
         input_layer = nn.Linear(n_observations, layers[0])
         output_layer = nn.Linear(layers[-1],
                                       n_actions)
@@ -37,16 +42,16 @@ class QNetwork(nn.Module):
             input_layer,
             nn.ReLU(),
             *hidden_layers,
-            output_layer)
+            output_layer).to(device)
 
     def forward(self, x):
 
-        """
-        Feed input data into the Q-Network
+        """Feed input data into the Q-Network
 
         Parameters:
-        - x: A minibatch of states.
+        - x = A minibatch of states.
         """
 
         logits = self.layer_stack(x)
         return logits
+
