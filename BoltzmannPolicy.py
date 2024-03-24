@@ -24,7 +24,7 @@ class BoltzmannPolicy(Policy):
         Initializes the temperature parameters
         """
         self.temperature = temperature
-
+        
     def select_action(self, q_values) -> int:
 
         """
@@ -38,11 +38,15 @@ class BoltzmannPolicy(Policy):
         - int: The index that refers to the selected action
         """
 
+        try:
+            exp_values = torch.exp(q_values / self.temperature)
+            probabilities = exp_values / torch.sum(exp_values)
+            sampled_action = torch.multinomial(probabilities, 1).item()
+            return sampled_action
+        except:
+            self.select_action = lambda q_values: torch.argmax(q_values).item()
+            return self.select_action(q_values)
 
-        exp_values = torch.exp(q_values / self.temperature)
-        probabilities = exp_values / torch.sum(exp_values)
-        sampled_action = torch.multinomial(probabilities, 1).item()
-        return sampled_action
 
     def update_exploration_rate(self, new_value) -> None:
 
