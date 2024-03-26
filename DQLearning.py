@@ -70,21 +70,6 @@ class DQLearning(object):
         #Prepare the logging class TrainLogger
         self.logger = parameters["logger"]
 
-    def _flatten_state(self, state) -> list:
-
-        """
-        Helper function used to flatten the state dict in order to feed
-        it to other methods.
-        """
-        raw_state = []
-        for value in list(state.values()):
-            if (isinstance(value, np.ndarray)):
-                for value2 in value:
-                    raw_state.append(value2)
-            else:
-                raw_state.append(value)
-        return raw_state
-
     def _gather_experiences(self):
 
         """
@@ -102,7 +87,6 @@ class DQLearning(object):
                 state, info = self.environment.reset(seed=seed)
             else:
                 state = next_state
-#            raw_state = torch.Tensor(self._flatten_state(state))
             raw_state = torch.Tensor(state).to(self.device)
             with (torch.no_grad()):
                 q_tar = self.q_estimator.q_estimator(raw_state)
@@ -130,7 +114,6 @@ class DQLearning(object):
             ep_length = 0
             ep_reward = 0
             state, info = self.environment.reset()
-#            state = torch.Tensor(self._flatten_state(state))
             state = torch.Tensor(state).to(self.device)
             while (not done):
                 with (torch.no_grad()):
@@ -138,7 +121,6 @@ class DQLearning(object):
                 action = self.action_selector.select_action(q_estimate)
                 next_state, reward, terminated, truncated, info =\
                     self.environment.step(action)
-#                state = torch.Tensor(self._flatten_state(next_state))
                 state = torch.Tensor(next_state).to(self.device)
                 done = terminated or truncated
                 ep_length += 1
@@ -189,7 +171,7 @@ class DQLearning(object):
         """
 
         self.logger.print_training_header()
-        for step in range(self.training_steps):
+        for step in range(1, self.training_steps + 1):
             step_losses = []
             self._gather_experiences()
             for b in range(self.batches):
