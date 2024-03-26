@@ -110,6 +110,8 @@ class ConfigurationLoader(object):
 
         if (loss_fn_id == "mse"):
             loss_fn = torch.nn.MSELoss()
+        elif (loss_fn_id == "mae"):
+            loss_fn = torch.nn.L1Loss()
         elif (loss_fn_id == "crossentropy"):
             loss_fn = torch.nn.CrossEntropyLoss()
         elif (loss_fn_id == "huber"):
@@ -283,9 +285,6 @@ def show_validation(env):
     import networkx as nx
 
     G = env.network_graph.graph
-    deployment_schme = plt.figure(figsize=(7,7))
-    plt.xticks([])
-    plt.yticks([])
 
     # Show the deployment scheme and all the heatmaps.
 
@@ -294,38 +293,34 @@ def show_validation(env):
     for node in G:
         positions_dict[node] = [node.position[1], xMax - node.position[0]]
 
-    colors = []
-    for index in range(len(list(G.nodes)[0].microservices)):
-         colors.append([node.microservices[index] * (index + 1) for node in G])
-    colors = np.sum(colors, axis=0)
-    print(colors)
-    nx.draw_networkx(G,
-                     pos=positions_dict, 
-                     node_color=colors,
-                     cmap="Pastel1",
-                     with_labels=False)
-
-    heatmaps = plt.figure(figsize=(7,7))
     plt.xticks([])
     plt.yticks([])
     fig, axes = plt.subplots(nrows=2, ncols=2)
     ax = axes.flatten()
     for ms_index in range(len(list(G.nodes)[0].microservices)):
         colors = [uav.microservicesHeat[ms_index] for uav in G]
+        labels = {}
+        for uav in G:
+            if (uav.microservices[ms_index] == 1):
+                labels[uav] = f"X"
+            else:
+                labels[uav] = ""
         nx.draw_networkx(G,
                          pos=positions_dict,
                          node_color=colors,
                          cmap="inferno",
                          vmin=0,
                          vmax=5,
-                         with_labels=False,
-                         ax=ax[ms_index])
-
-    vmin, vmax = 0, 5
-    sm = plt.cm.ScalarMappable(cmap="inferno", 
-                               norm=plt.Normalize(vmin=vmin, vmax=vmax))
-    sm.set_array([])
-    plt.colorbar(sm, ax=ax)
+                         with_labels=True,
+                         labels = labels,
+                         font_color = "royalblue",
+                         font_size = 20,
+                         font_weight = 30,
+                         ax = ax[ms_index])
+    ax[0].set_title("Microservice 3")
+    ax[1].set_title("Microservice 4")
+    ax[2].set_title("Microservice 1")
+    ax[3].set_title("Microservice 2")
     plt.show()
 
 def print_validation(env):
@@ -346,11 +341,16 @@ def main(args):
     torch.manual_seed(0)
     agent = ConfigurationLoader(args).get_agent()
     agent.train()
-    
-    agent.q_estimator.load_model()
-    agent.validate_learning(1, testing = True)
-    show_validation(agent.environment)
-    print_validation(agent.environment)
+
+#    agent.q_estimator.load_model()
+#    agent.validate_learning(1)
+#    show_validation(agent.environment)
+#    random.seed(0)
+#    np.random.seed(0)
+#    torch.manual_seed(0)
+#    agent.scripted_validate_learning([9, 5, 6, 10, 12, 3])
+#    show_validation(agent.environment)
+
 
 if __name__ == "__main__":
     main(parse_arguments())

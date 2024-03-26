@@ -129,8 +129,7 @@ class NetworkEnv(gym.Env):
         extra_steps_penalty = math.pow(0.95, extra_steps)
         current_solution = self.network_graph.get_total_cost()
         solution_ratio = current_solution / self.worstCaseSolution
-        reward = (1 - math.pow(solution_ratio, 3)) \
-                 * extra_steps_penalty
+        reward = (1 - solution_ratio) * extra_steps_penalty
         #print("extra_steps_penalty:", extra_steps_penalty, "current_solution", current_solution, "self.worstCaseSolution", self.worstCaseSolution, "reward", reward)
         return reward
 
