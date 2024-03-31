@@ -10,6 +10,8 @@ from perlin_noise import PerlinNoise
 import random
 import math
 import copy
+import matplotlib.pyplot as plt
+
 
 class NetworkEnv(gym.Env):
 
@@ -130,7 +132,10 @@ class NetworkEnv(gym.Env):
         current_solution = self.network_graph.get_total_cost()
         solution_ratio = current_solution / self.worstCaseSolution
         reward = (1 - solution_ratio) * extra_steps_penalty
-        #print("extra_steps_penalty:", extra_steps_penalty, "current_solution", current_solution, "self.worstCaseSolution", self.worstCaseSolution, "reward", reward)
+#        print("Episode Reward:  ", reward,
+#                "\n  -Extra steps:  ", extra_steps,
+#                "\n  -Current Hops: ", current_solution,
+#                "\n  -Worst Hops:  ", self.worstCaseSolution)
         return reward
 
     def build_env(self, input_file):
@@ -251,6 +256,50 @@ class NetworkEnv(gym.Env):
 
         info = self._get_info()
         return observation, reward, terminated, False, info
+
+    def show_episode_result(self):
+
+        """Use Matplotlib and NetworkX to show the resulting deployment
+        scheme.
+        
+        For each microservice, a figure with its heatmap and the cost
+        map is shown. The UAV where instances are deployed are 
+        highlighted and the cost of the solution is analyzed.
+        """
+
+        G = self.network_graph.graph
+        xMax = max([node.position[0] for node in G])
+        positions_dict = {}
+        for node in G:
+            positions_dict[node] = [node.position[1], xMax - node.position[0]]
+
+        microservices = sorted(self.microservices, 
+                               key=lambda ms: ms.replicationIndex)
+        microservices = [ms.id for ms in microservices]
+
+        for ms_index, microservice in enumerate(microservices):
+            cost = [uav.microservicesCosts[ms_index] for uav in G]
+            colors = [uav.microservicesHeat[ms_index] for uav in G]
+            labels = {}
+            for i, uav in enumerate(self.network_graph.graph):
+                if (uav.microservices[ms_index] == 1):
+                    labels[uav] = f"X"
+                else:
+                    labels[uav] = f"{cost[i]}"
+
+            plt.figure(f"{microservice}")
+            nx.draw_networkx(G,
+                             pos=positions_dict,
+                             node_color=colors,
+                             cmap="inferno",
+                             vmin=0,
+                             vmax=5,
+                             with_labels=True,
+                             labels = labels,
+                             font_color = "royalblue",
+                             font_size = 20,
+                             font_weight = 30)
+        plt.show()
 
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
