@@ -256,46 +256,8 @@ class ConfigurationLoader(object):
         """
         Get the agent ready to train.
         """
+
         parameters = self.get_parameters()
         agent = DQLearning(parameters)
         return agent
 
-def parse_arguments ():
-    args_parser = argparse.ArgumentParser(
-        description= ("Create DRL Agent to learn how "
-                      "to perform in a given enviroment."))
-    args_parser.add_argument("Filename",
-                             metavar="F",
-                             type=Path,
-                             nargs=1,
-                             help=("The path of the input file "
-                                   "with the agent parameters."))
-    args = args_parser.parse_args()
-    return args.Filename[0]
-
-def print_validation(env):
-
-    G = env.network_graph.graph
-    heatmaps = []
-    deployment = []
-
-    cost_fn_value = 0
-    for uav in G:
-        print(uav)
-        for cost in uav.microservicesCosts:
-            cost_fn_value += cost
-
-def main(args):
-    random.seed(110)
-    np.random.seed(110)
-    torch.manual_seed(110)
-    agent = ConfigurationLoader(args).get_agent()
-    #agent.train()
-
-    agent.q_estimator.load_model()
-    agent.validate_learning(1)
-    func = agent.environment.get_wrapper_attr('show_episode_result')()
-
-
-if __name__ == "__main__":
-    main(parse_arguments())

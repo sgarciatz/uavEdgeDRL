@@ -197,6 +197,39 @@ class DQLearning(object):
         self.logger.print_training_footer()
         self.q_estimator.pickle_model()
 
+    def test(self, n_validations: int):
+
+        """Test the already trained agent. This method is similar to
+        validate_learning but it does not use the policy, instead the
+        action with the highest Q value is chosen.
+
+        Parameters:
+        - n_validations: int = The number of episodes to carry out.
+        """
+
+        rewards = []
+        ep_lengths = []
+        for _ in range(n_validations):
+            done = False
+            ep_length = 0
+            ep_reward = 0
+            state, info = self.environment.reset()
+            state = torch.Tensor(state).to(self.device)
+            while (not done):
+                with (torch.no_grad()):
+                    q_estimate = self.q_estimator.q_estimator(state)
+                action = q_estimate.argmax().item()
+                next_state, reward, terminated, truncated, info =\
+                    self.environment.step(action)
+                state = torch.Tensor(next_state).to(self.device)
+                done = terminated or truncated
+                ep_length += 1
+                ep_reward += reward
+            rewards.append(ep_reward)
+            ep_lengths.append(ep_length)
+
+        return sum(rewards) / n_validations, sum(ep_lengths) / n_validations
+
 if __name__ == "__main__":
     import gymnasium as gym
     import gym_network

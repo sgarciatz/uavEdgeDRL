@@ -12,7 +12,10 @@ import math
 import copy
 import matplotlib.pyplot as plt
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> feature/test-pickled-models
 
 class NetworkEnv(gym.Env):
 
@@ -132,10 +135,10 @@ class NetworkEnv(gym.Env):
         current_solution = self.network_graph.get_total_cost()
         solution_ratio = current_solution / self.worstCaseSolution
         reward = (1 - solution_ratio) * extra_steps_penalty
-        print("Episode Reward:  ", reward,
-                "\n  -Extra steps:  ", extra_steps,
-                "\n  -Current Hops: ", current_solution,
-                "\n  -Worst Hops:  ", self.worstCaseSolution)
+#        print("Episode Reward:  ", reward,
+#              "\n  -Extra steps:  ", extra_steps,
+#              "\n  -Current Hops: ", current_solution,
+#              "\n  -Worst Hops:  ", self.worstCaseSolution)
         return reward
 
     def build_env(self, input_file):
@@ -272,8 +275,8 @@ class NetworkEnv(gym.Env):
         positions_dict = {}
         for node in G:
             positions_dict[node] = [node.position[1], xMax - node.position[0]]
-
-        microservices = sorted(self.microservices, key=lambda ms: ms.replicationIndex)
+        microservices = sorted(self.microservices, 
+                               key=lambda ms: ms.replicationIndex)
         microservices = [ms.id for ms in microservices]
 
         for ms_index, microservice in enumerate(microservices):
