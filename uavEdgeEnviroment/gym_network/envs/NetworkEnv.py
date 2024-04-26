@@ -12,10 +12,6 @@ import math
 import copy
 import matplotlib.pyplot as plt
 
-<<<<<<< HEAD
-
-=======
->>>>>>> feature/test-pickled-models
 
 class NetworkEnv(gym.Env):
 

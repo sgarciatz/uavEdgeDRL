@@ -47,6 +47,7 @@ class NetworkGraph(object):
             for ms_index in range(self.n_microservices):
                 uav.microservicesCosts[ms_index] =\
                     path_cost * uav.microservicesHeat[ms_index]
+
     def generate_heatmaps(self):
 
         """
@@ -110,13 +111,13 @@ class NetworkGraph(object):
         heatmaps for each microservice. Calculate the worst cost
         """
 
-        self.generate_heatmaps()
-        for uav in self.graph:
+        #self.generate_heatmaps()
+        for i, uav in enumerate(self.graph):
             uav.ramAllocated = 0
             uav.cpuAllocated = 0
             for ms_index in range(self.n_microservices):
                 uav.microservices[ms_index] = 0
                 cost = uav.microservicesHeat[ms_index]\
-                       * self.longest_paths_costs[ms_index]
+                       * self.longest_paths_costs[i]
                 uav.microservicesCosts[ms_index] = cost
 

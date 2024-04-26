@@ -209,6 +209,8 @@ class DQLearning(object):
 
         rewards = []
         ep_lengths = []
+        jumps = []
+        network_graph = self.environment.get_wrapper_attr("network_graph")
         for _ in range(n_validations):
             done = False
             ep_length = 0
@@ -216,6 +218,7 @@ class DQLearning(object):
             state, info = self.environment.reset()
             state = torch.Tensor(state).to(self.device)
             while (not done):
+                jump_sum = network_graph.get_total_cost()
                 with (torch.no_grad()):
                     q_estimate = self.q_estimator.q_estimator(state)
                 action = q_estimate.argmax().item()
@@ -225,10 +228,10 @@ class DQLearning(object):
                 done = terminated or truncated
                 ep_length += 1
                 ep_reward += reward
+            jumps.append(jump_sum)
             rewards.append(ep_reward)
             ep_lengths.append(ep_length)
-
-        return sum(rewards) / n_validations, sum(ep_lengths) / n_validations
+        return sum(rewards) / n_validations, sum(ep_lengths) / n_validations, sum(jumps) / n_validations
 
 if __name__ == "__main__":
     import gymnasium as gym
