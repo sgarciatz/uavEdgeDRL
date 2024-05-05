@@ -219,7 +219,7 @@ class GLOMIP(object):
             done = False
             ep_length = 0
             ep_reward = 0
-            state, info = self.env.reset(testing=True)
+            state, info = self.env.reset()
             self.build_model()
             solution_dict = self.solve()
             jumps.append(sum([z.x for z in self.Z.flatten()]))

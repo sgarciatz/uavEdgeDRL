@@ -115,7 +115,8 @@ class ConfigurationLoader(object):
         elif (loss_fn_id == "crossentropy"):
             loss_fn = torch.nn.CrossEntropyLoss()
         elif (loss_fn_id == "huber"):
-            loss_fn = torch.nn.HuberLoss()
+            loss_fn = torch.nn.HuberLoss(reduction="sum")
+
         return loss_fn
 
     def get_q_estimator(self) -> QEstimator:
