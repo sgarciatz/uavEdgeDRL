@@ -1,4 +1,3 @@
-from gym_network.envs.Microservice import Microservice
 import numpy as np
 
 class UAV(object):
@@ -26,75 +25,42 @@ class UAV(object):
     
     def __init__(self, uavId: str,
                  position: list[int],
-                 ramCapacity: float = 4.0,
-                 ramAllocated: float = 0.0,
-                 cpuCapacity: float = 4.0,
-                 cpuAllocated: float = 0.0,
-                 microservices: list[Microservice] = [],
-                 longestPath: int = 100 ) -> None:
+                 ram_cap: float = 4.0,
+                 ram_left: float = 4.0,
+                 cpu_cap: float = 4.0,
+                 cpu_left: float = 4.0,
+                 ms_heats: list = []) -> None:
 
         self.id = uavId
         self.position = position
-        self.ramCapacity = ramCapacity
-        self.ramAllocated = ramAllocated
-        self.cpuCapacity = cpuCapacity
-        self.cpuAllocated = cpuAllocated
-        self.microservices = np.zeros(len(microservices))
-        self.microservicesHeat = np.zeros(len(microservices))
-        for index, row in enumerate(self.microservicesHeat):
-            self.microservicesHeat[index] = \
-                microservices[index]\
-                    .heatmap[self.position[0]][self.position[1]]
-        self.microservicesCosts = []
-        for heatValue in self.microservicesHeat:
-            self.microservicesCosts.append(heatValue * longestPath)
+        self.ram_cap = ram_cap
+        self.ram_left = ram_left
+        self.cpu_cap = cpu_cap
+        self.cpu_left = cpu_left
+        self.ms_heats = ms_heats
 
-    def deployMicroservice(self, ms: Microservice, msIndex: int) -> bool:
 
-        """Deploy a microservice if it fits"""
+    def ms_fits(self, ms):
 
-        if (self.ms_fits(ms, msIndex)):
-            self.ramAllocated += ms.ramRequirement
-            self.cpuAllocated += ms.cpuRequirement
-            self.microservices[msIndex] = 1
+        """Check wether a microservice fits or not.
+        
+        Parameters:
+        - ms: the microservice to deploy.
+        """
+
+        if ((ms.ram_req <= self.ram_left) and (ms.cpu_req <= self.cpu_left)):
             return True
         else:
             return False
 
+    def deploy_ms(self, ms):
 
-    def ms_fits(self, ms: Microservice, msIndex: int) -> bool:
+        """Reduce the ram_left and the cpu_left because of the
+        deployment of ms.
+        """
 
-        ramRemaining: float = \
-            self.ramCapacity - (self.ramAllocated + ms.ramRequirement)
-        cpuRemaining: float = \
-            self.cpuCapacity - (self.cpuAllocated + ms.cpuRequirement)
-        if ((ramRemaining < 0) or (cpuRemaining < 0)):
-            return False
-        else:
-            return True
+        self.ram_left -= ms.ram_req
+        self.cpu_left -= ms.cpu_req
+        ms.replic_left -= 1
 
-    def __str__(self) -> str:
-        output =   f'UAV id: {self.id}'\
-                 + f'\n\t-Position: {self.position}'\
-                 + f'\n\t-RAM: {self.ramCapacity} (capacity)'\
-                 + f' {self.ramAllocated} (allocated)'\
-                 + f'\n\t-CPU: {self.cpuCapacity} (capacity)'\
-                 + f' {self.cpuAllocated} (allocated)'\
-                 + f'\n\t-Microservices: {self.microservices}'\
-                 + f'\n\t-Microservices\'s heat: {self.microservicesHeat}'\
-                 + f'\n\t-Microservices cost: {self.microservicesCosts}'
-        return output
-                
-    def toJSON(self) -> dict:
-        json = {
-            'uavId': self.id,
-            'position': self.position,
-            'ramCapacity': self.ramCapacity,
-            'ramAllocated': self.ramAllocated,
-            'cpuCapacity': self.cpuCapacity,
-            'cpuAllocated': self.cpuAllocated,
-            'microservices': [ms for ms in self.microservices],
-            'microservicesHeat': [heat for heat in self.microservicesHeat],
-            'microservicesCost': [cost for cost in self.microservicesCosts]
-            }
-        return json
+

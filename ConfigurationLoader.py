@@ -127,8 +127,7 @@ class ConfigurationLoader(object):
 
         n_obs = gym.spaces.utils.flatten_space(
                     self.env.observation_space).shape[0]
-        n_act = gym.spaces.utils.flatten_space(
-                    self.env.action_space).shape[0]
+        n_act = self.env.action_space[0].n * self.env.action_space[1].n
         config = self.configuration["hyperparameters"]["q_estimator"]
         network_type = "dueling"
         if ("type" in config):

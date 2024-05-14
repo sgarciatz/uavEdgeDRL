@@ -63,6 +63,7 @@ class DQLearning(object):
 
         # Set Components
         self.environment = parameters["env"]
+
         self.q_estimator = parameters["q_estimator"]
         self.experience_sampler = parameters["memory"]
         self.action_selector = parameters["action_selector"]
@@ -92,10 +93,18 @@ class DQLearning(object):
                 q_tar = self.q_estimator.q_estimator(raw_state)
             action = self.action_selector.select_action(q_tar)
             next_state, reward, terminated, truncated, info =\
-                self.environment.step(action)
+                self.environment.step(self.fold_action(action))
             done = terminated or truncated
             experience = Experience(state, action, reward, next_state, done, 99)
             self.experience_sampler.add_experience(experience)
+
+    def fold_action(self, action):
+
+        """Decompose the action into uav and ms."""
+
+        action_uav = action // self.environment.action_space[1].n
+        action_ms = action % self.environment.action_space[1].n
+        return [action_uav, action_ms]
 
     def validate_learning(self, n_validations: int):
 
@@ -120,7 +129,7 @@ class DQLearning(object):
                     q_estimate = self.q_estimator.q_estimator(state)
                 action = self.action_selector.select_action(q_estimate)
                 next_state, reward, terminated, truncated, info =\
-                    self.environment.step(action)
+                self.environment.step(self.fold_action(action))
                 state = torch.Tensor(next_state).to(self.device)
                 done = terminated or truncated
                 ep_length += 1
@@ -218,14 +227,15 @@ class DQLearning(object):
             state, info = self.environment.reset()
             state = torch.Tensor(state).to(self.device)
             while (not done):
-                jump_sum = network_graph.get_total_cost()
                 with (torch.no_grad()):
                     q_estimate = self.q_estimator.q_estimator(state)
                 action = q_estimate.argmax().item()
                 next_state, reward, terminated, truncated, info =\
-                    self.environment.step(action)
+                    self.environment.step(self.fold_action(action))
                 state = torch.Tensor(next_state).to(self.device)
                 done = terminated or truncated
+                if (done): 
+                    jump_sum = network_graph.get_total_cost()
                 ep_length += 1
                 ep_reward += reward
             jumps.append(jump_sum)

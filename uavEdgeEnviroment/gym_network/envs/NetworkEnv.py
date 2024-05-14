@@ -1,6 +1,6 @@
 import json
 import gymnasium as gym
-from gymnasium.spaces import Tuple, Box, Discrete, Dict
+from gymnasium.spaces import Tuple, Box, Discrete, MultiDiscrete, Dict
 import networkx as nx
 from gym_network.envs.UAV import UAV
 from gym_network.envs.Microservice import Microservice
@@ -45,20 +45,9 @@ class NetworkEnv(gym.Env):
         UAVs each microservice.
         """
 
-        info: dict = {}
-        for uav in list(self.network_graph.graph.nodes):
-            info[f"{uav.id}-microservicesCosts"] =\
-                np.array(uav.microservicesCosts)
-            info[f"{uav.id}-cpuAvailable"] =\
-                np.array([uav.cpuCapacity - uav.cpuAllocated])
-            info[f"{uav.id}-ramAvailable"] =\
-                np.array([uav.ramCapacity - uav.ramAllocated])
-
-        for i, ms in enumerate(self.msToDeploy):
-            info[f"next_{i}-msId"] = float(ms.idToInt())
-            info[f"next_{i}-cpuReq"] = np.array([ms.cpuRequirement])
-            info[f"next_{i}-ramReq"] = np.array([ms.ramRequirement])
-        return info
+        uav_observation = self.network_graph.get_uav_info()
+        ms_observation = self.network_graph.get_ms_info()
+        return uav_observation | ms_observation
 
     def _get_obs(self):
 
@@ -67,56 +56,32 @@ class NetworkEnv(gym.Env):
         """
 
 
-        uav_observation = []
-        for uav in self.network_graph.graph:
-            for ms_index in range(len(self.microservices)):
-                uav_observation.append(int(uav.microservicesCosts[ms_index]))
-            uav_observation.append(
-                int(uav.ms_fits(self.msToDeploy[0],
-                                self.msToDeploy[0].idToInt())))
-        ms_observation = []
-        for ms in self.msToDeploy:
-            ms_observation.append(ms.idToInt())
-        return np.concatenate((uav_observation, ms_observation), dtype=np.int32)
+        uav_observation = self.network_graph.get_uav_info()
+        uav_ms_cost_obs = []
+        for uav in uav_observation.values():
+            [uav_ms_cost_obs.append(value) for value in uav['ms_costs']]
+        uav_ram_left_obs = []
+        for uav in uav_observation.values():
+            uav_ram_left_obs.append(uav['ram_left'])
+        uav_cpu_left_obs = []
+        for uav in uav_observation.values():
+            uav_cpu_left_obs.append(uav['cpu_left'])
 
-    def _reset_deployment_queue(self):
+        ms_observation = self.network_graph.get_ms_info()
+        ms_ram_left_obs = []
+        for ms in ms_observation.values():
+            ms_ram_left_obs.append(ms['ram_req'])
+        ms_cpu_req_obs = []
+        for ms in ms_observation.values():
+            ms_cpu_req_obs.append(ms['cpu_req'])
+        ms_repl_index = []
+        for ms in ms_observation.values():
+            ms_repl_index.append(ms['replic_left'])
 
-        """
-        Reset the queue of deployment of microservices.
-        """
-
-        self.msToDeploy = []
-        msListCopy = copy.deepcopy(self.microservices)
-        done = False
-        while (not done):
-            done = True
-            for msCopy, microservice in zip(msListCopy, self.microservices):
-                if (msCopy.replicationIndex > 0):
-                    self.msToDeploy.append(microservice)
-                    msCopy.replicationIndex -= 1
-                    done = False
-
-    def _pop_deployment_queue(self) -> Microservice:
-
-        """
-        Pop the first element from the deployment list and append an
-        \"empty microservice\" at the end.
-        """
-        ms = self.msToDeploy.pop(0)
-        self.msToDeploy.append(Microservice('empty', -1, -1, -1))
-        return ms
-
-    def _reinsert_deployment_queue(self, ms: Microservice) -> None:
-
-        """Reinsert a microservice that could not be deployed.
-
-        Arguments:
-        - ms: Microservice = The microservice that could not be
-            deployed and are going to be reinserted.
-        """
-
-        self.msToDeploy.insert(0, ms)
-        self.msToDeploy.pop(-1)
+        return np.concatenate((uav_ms_cost_obs, uav_ram_left_obs,
+                               uav_cpu_left_obs, ms_ram_left_obs,
+                               ms_cpu_req_obs, ms_repl_index),
+                              dtype=np.int32)
 
     def _get_reward(self) -> float:
 
@@ -126,15 +91,16 @@ class NetworkEnv(gym.Env):
         reward = (1 - s/w_s) * p
         """
 
-        extra_steps = self.episode_step - len(self.msToDeploy)
+        steps = sum([ms.replic_index for ms in self.network_graph.ms_list])
+        extra_steps = self.episode_step - steps
         extra_steps_penalty = math.pow(0.95, extra_steps)
         current_solution = self.network_graph.get_total_cost()
         solution_ratio = current_solution / self.worstCaseSolution
         reward = (1 - solution_ratio) * extra_steps_penalty
-#        print("Episode Reward:  ", reward,
-#              "\n  -Extra steps:  ", extra_steps,
-#              "\n  -Current Hops: ", current_solution,
-#              "\n  -Worst Hops:  ", self.worstCaseSolution)
+        print("Episode Reward:  ", reward,
+              "\n  -Extra steps:  ", extra_steps,
+              "\n  -Current Hops: ", current_solution,
+              "\n  -Worst Hops:  ", self.worstCaseSolution)
         return reward
 
     def build_env(self, input_file):
@@ -147,21 +113,34 @@ class NetworkEnv(gym.Env):
         the lists in the UAVs.
         """
 
-        inputData = json.load(open(input_file))
-        msList: list[Microservice] = []
-        for ms in inputData['microserviceList']:
-                msList.append(Microservice(ms['microserviceId'], 
-                                           ms['ramRequirement'],
-                                           ms['cpuRequirement'],
-                                           float(ms['replicationIndex']),
-                                           np.array(ms['heatmap'])))
-        self.microservices = sorted(msList, 
-                                    key=lambda ms: ms.replicationIndex)
+        input_data = json.load(open(input_file))
+        ms_heatmaps = []
+        
+        for ms in input_data['microserviceList']:
+                ms_heatmaps.append(ms['heatmap'])
+        ms_heatmaps = np.asarray(ms_heatmaps)
+        uav_list = []
+        for uav in input_data['uavList']:
+            ms_heats = ms_heatmaps[:,uav['position'][0],uav['position'][1]]
+            uav_list.append(UAV(uav['uavId'],
+                            uav['position'],
+                            uav['ramCapacity'],
+                            uav['ramCapacity'],
+                            uav['cpuCapacity'],
+                            uav['cpuCapacity'],
+                            ms_heats))
 
-        self._reset_deployment_queue()
+        ms_list = []
+        for ms in input_data['microserviceList']:
+                ms_list.append(Microservice(ms['microserviceId'], 
+                                            ms['ramRequirement'],
+                                            ms['cpuRequirement'],
+                                            float(ms['replicationIndex'])))
 
-        self.network_graph = NetworkGraph(inputData['uavList'],
-                                          self.microservices)
+        self.network_graph = NetworkGraph(uav_list,
+                                          ms_list,
+                                          input_data['shape'])
+        self.network_graph.generate_heatmaps()
 
     def build_action_space(self):
 
@@ -169,9 +148,12 @@ class NetworkEnv(gym.Env):
         because it is used for sampling randomly.
         """
 
-        self.action_space = Discrete(len(self.network_graph.graph),
-                                     start=0,
-                                     seed=42)
+        actions = [len(self.network_graph.ms_list), 
+                   len(self.network_graph.uav_list)]
+
+        self.action_space = MultiDiscrete(actions,
+                                          start=[0,0],
+                                          seed=42)
 
     def build_observation_space(self):
 
@@ -180,22 +162,68 @@ class NetworkEnv(gym.Env):
         microservices to deploy.
         """
 
-        uav_obs_length = len(self.network_graph.graph.nodes)
-        uav_obs_length *= (len(self.microservices) + 1)
 
-        uav_observation = Box(low=0,
-                              high=5*len(self.network_graph.graph.nodes),
-                              shape=(uav_obs_length,),
+        uav_ms_cost = len(self.network_graph.uav_list)\
+                      * len(self.network_graph.ms_list)
+
+        uav_ram_left = len(self.network_graph.uav_list)
+        max_ram_cap = max([uav.ram_cap for uav in self.network_graph.uav_list])
+        uav_cpu_left = len(self.network_graph.uav_list)
+        max_cpu_cap = max([uav.cpu_cap for uav in self.network_graph.uav_list])
+
+        ms_ram_req = len(self.network_graph.ms_list)
+        max_ram_req = max([ms.ram_req for ms in self.network_graph.ms_list])
+        ms_cpu_req = len(self.network_graph.ms_list)
+        max_cpu_req = max([ms.cpu_req for ms in self.network_graph.ms_list])
+
+
+        ms_repl_index = len(self.network_graph.ms_list)
+        max_repl_index =\
+            max([ms.replic_index for ms in self.network_graph.ms_list])
+        
+        uav_ms_cost_obs = Box(low=0,
+                              high=5*(self.network_graph.diameter+1),
+                              shape=(uav_ms_cost,),
                               dtype= np.intc)
-        ms_queue_observation = Box(low=-1,
-                                    high= len(self.microservices),
-                                    shape=(len(self.msToDeploy),),
-                                    dtype=np.intc)
+        uav_ram_left_obs = Box(low=0,
+                               high=max_ram_cap,
+                               shape=(uav_ram_left,),
+                               dtype= np.intc)
+        uav_cpu_left_obs = Box(low=0,
+                               high=max_cpu_cap,
+                               shape=(uav_cpu_left,),
+                               dtype=np.intc)
+        ms_ram_req_obs = Box(low=0,
+                              high=max_ram_req,
+                              shape=(ms_ram_req,),
+                              dtype= np.intc)
+        ms_cpu_req_obs = Box(low=0,
+                              high=max_cpu_req,
+                              shape=(ms_cpu_req,),
+                              dtype= np.intc)
+        ms_repl_index = Box(low=0,
+                            high=max_repl_index,
+                            shape=(ms_repl_index,),
+                            dtype=np.intc)
 
         self.observation_space = Tuple(
-            (uav_observation, ms_queue_observation),
+            (uav_ms_cost_obs, uav_ram_left_obs, uav_cpu_left_obs,
+             ms_ram_req_obs, ms_cpu_req_obs, ms_repl_index),
             seed=42)
-        self.observation_space = gym.spaces.utils.flatten_space(self.observation_space)
+        self.observation_space = gym.spaces.utils.flatten_space(
+            self.observation_space)
+
+
+    def is_terminal_state(self):
+
+        """ Check if all the microservice instances has been 
+        deployed.
+        """
+        is_terminal = True
+        for ms in self.network_graph.ms_list:
+            degree = self.network_graph.graph.degree(ms)
+            is_terminal = is_terminal and (degree == ms.replic_index)
+        return is_terminal
 
     def reset(self, seed=None, options=None, testing: bool = False):
         """
@@ -211,11 +239,18 @@ class NetworkEnv(gym.Env):
             self.build_env(self.input_file)
         else:
             self.network_graph.reset()
-            self._reset_deployment_queue()
-        self.worstCaseSolution = self.network_graph.get_total_cost()
+        self.worstCaseSolution = self.network_graph.get_baseline_estimation()
+#        self.network_graph.graph.add_edge(self.network_graph.uav_list[1], self.network_graph.ms_list[0])
+#        self.network_graph.graph.add_edge(self.network_graph.uav_list[27], self.network_graph.ms_list[1])
+#        self.network_graph.graph.add_edge(self.network_graph.uav_list[48], self.network_graph.ms_list[2])
+#        self.network_graph.graph.add_edge(self.network_graph.uav_list[15], self.network_graph.ms_list[3])
+#        self.network_graph.draw_graph()
+#        for ms in self.network_graph.ms_list:
+#            self.network_graph.draw_heatmap(ms)
+#            self.network_graph.draw_path_cost(ms)
         observation = self._get_obs()
         info = {}
-#        print(self.microservices)
+
         return observation, info
 
     def step(self, action):
@@ -233,79 +268,44 @@ class NetworkEnv(gym.Env):
         
         The agents chooses the uav to deploy the ms.
         """
-        
-        ms = self._pop_deployment_queue()
-        msIndex = self.microservices.index(ms)
-        dstUav = list(self.network_graph.graph.nodes)[action]
-        is_deployed = dstUav.deployMicroservice(ms, msIndex)
+
+        ms = self.network_graph.ms_list[action[0]]
+        uav = self.network_graph.uav_list[action[1]]
         reward = 0
-        if (is_deployed):
-            self.network_graph.calculate_serving_cost(msIndex)
-        else:
-            self._reinsert_deployment_queue(ms)
-            reward = -1.0
-
-        observation = self._get_obs()
-        terminated = False
-
         self.episode_step += 1
-        if (self.msToDeploy[0].id == "empty"): 
-            terminated = True
-            reward = self._get_reward()
-
+        if (self.network_graph.graph.has_edge(ms, uav)\
+            or (not uav.ms_fits(ms)) or (ms.replic_left) == 0):
+            reward = -1
+        else:
+            uav.deploy_ms(ms)
+            self.network_graph.graph.add_edge(ms, uav)
+        observation = self._get_obs()
         info = self._get_info()
+        terminated = self.is_terminal_state()
+        if (terminated):
+            reward = self._get_reward()
+        self.network_graph.draw_graph()
+        self.network_graph.draw_path_costs()
         return observation, reward, terminated, False, info
-
-    def show_episode_result(self):
-
-        """Use Matplotlib and NetworkX to show the resulting deployment
-        scheme.
-        
-        For each microservice, a figure with its heatmap and the cost
-        map is shown. The UAV where instances are deployed are 
-        highlighted and the cost of the solution is analyzed.
-        """
-
-        G = self.network_graph.graph
-        xMax = max([node.position[0] for node in G])
-        positions_dict = {}
-        for node in G:
-            positions_dict[node] = [node.position[1], xMax - node.position[0]]
-        microservices = sorted(self.microservices, 
-                               key=lambda ms: ms.replicationIndex)
-        microservices = [ms.id for ms in microservices]
-
-        for ms_index, microservice in enumerate(microservices):
-            cost = [uav.microservicesCosts[ms_index] for uav in G]
-            colors = [uav.microservicesHeat[ms_index] for uav in G]
-            labels = {}
-            for i, uav in enumerate(self.network_graph.graph):
-                if (uav.microservices[ms_index] == 1):
-                    labels[uav] = f"X"
-                else:
-                    labels[uav] = f"{cost[i]}"
-
-            plt.figure(f"{microservice}")
-            nx.draw_networkx(G,
-                             pos=positions_dict,
-                             node_color=colors,
-                             cmap="inferno",
-                             vmin=0,
-                             vmax=5,
-                             with_labels=True,
-                             labels = labels,
-                             font_color = "royalblue",
-                             font_size = 20,
-                             font_weight = 30)
-        plt.show()
 
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
 
-    myEnv = NetworkEnv('/home/santiago/Documents/Trabajo/uavEdgeDRL/input/sources/micro_sized_scenario_00.json')
+    myEnv = NetworkEnv('/home/santiago/Documents/Trabajo/Workspace/GLOMIM/glomim_v1/InputScenarios/paper2_large_00.json')
+    observation, info = myEnv.reset()
     observation, info = myEnv.reset()
     steps = len(myEnv.msToDeploy)
-    for index in range(steps):
-        obs, reward, terminated, truncated, info = myEnv.step(index+2)
-    myEnv.show_episode_result()
+    myEnv.network_graph.draw_heatmap(myEnv.network_graph.ms_list[0])
+    myEnv.network_graph.draw_heightmap()
+    obs, reward, terminated, truncated, info = myEnv.step([0, 5])
+    obs, reward, terminated, truncated, info = myEnv.step([0, 26])
+    obs, reward, terminated, truncated, info = myEnv.step([1, 45])
+    obs, reward, terminated, truncated, info = myEnv.step([1, 25])
+    obs, reward, terminated, truncated, info = myEnv.step([2, 2])
+    obs, reward, terminated, truncated, info = myEnv.step([2, 32])
+    obs, reward, terminated, truncated, info = myEnv.step([3, 1])
+    obs, reward, terminated, truncated, info = myEnv.step([3, 55])
+    print(myEnv.network_graph.get_total_cost())
+
+    
 

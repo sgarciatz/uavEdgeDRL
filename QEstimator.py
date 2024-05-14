@@ -75,7 +75,8 @@ class QEstimator(object):
         dones = torch.tensor(np.array([1 - e.done for e in batch]),
                              dtype=torch.float32).to(self.device)
 
-        q_preds = torch.flatten(self.q_estimator(states).gather(1, actions))
+        q_preds = torch.flatten(
+            self.q_estimator(states).gather(1, actions))
         with (torch.no_grad()):
             if (self.second_q_estimator is not None):
                 if (self.variation == "ddqn"):
@@ -90,6 +91,25 @@ class QEstimator(object):
                 q_tar_next = self.q_estimator(next_states)\
                                             .max(dim=1).values
         q_tars = rewards + ( dones * self.gamma * q_tar_next)
+        loss = self.loss_fn(q_preds, q_tars)
+        td_error = torch.abs(q_tars - q_preds)
+        return loss, td_error
+
+    def calculate_q_loss_single_step(self, batch):
+
+        """Given a batch, calculate the loss using the given loss_fn"""
+
+        states = torch.tensor(np.array([e.state for e in batch]),
+                              dtype=torch.float32).to(self.device)
+        actions = torch.tensor(np.array([[e.action] for e in batch]),
+                               dtype=torch.int64).to(self.device)
+
+        q_preds = torch.flatten(self.q_estimator(states).gather(1, actions))
+        next_states = torch.tensor(np.array([e.next_state for e in batch]),
+                                   dtype=torch.float32).to(self.device)
+
+        q_tars = orch.tensor(np.array([e.next_state for e in batch]),
+                                   dtype=torch.float32).to(self.device)
         loss = self.loss_fn(q_preds, q_tars)
         td_error = torch.abs(q_tars - q_preds)
         return loss, td_error

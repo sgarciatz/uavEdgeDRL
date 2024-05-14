@@ -42,9 +42,9 @@ class GLOMIP(object):
         Return: np.ndarray = The array of UAVs.
         """
 
-        uav_list = self.env.get_wrapper_attr("network_graph").graph.nodes
-        uav_list = sorted(list(uav_list), key = lambda uav: uav.position[1])
-        uav_list = sorted(uav_list, key = lambda uav:uav.position[0])
+        uav_list = self.env.get_wrapper_attr("network_graph").uav_list
+#        uav_list = sorted(list(uav_list), key = lambda uav: uav.position[1])
+#        uav_list = sorted(uav_list, key = lambda uav:uav.position[0])
         return np.array(uav_list)
 
     def get_path_cost_matrix(self) -> np.ndarray:
@@ -74,8 +74,8 @@ class GLOMIP(object):
         Return: np.ndarray = The array of microservices.
         """
 
-        ms_list = self.env.get_wrapper_attr("microservices")
-        ms_list = sorted(ms_list, key = lambda ms: ms.replicationIndex)
+        ms_list = self.env.get_wrapper_attr("network_graph").ms_list
+#        ms_list = sorted(ms_list, key = lambda ms: ms.replic_index)
         return np.array(ms_list)
 
     def build_model(self):
@@ -98,7 +98,7 @@ class GLOMIP(object):
         
         max_heat = 0
         for uav in self.uav_list:
-            for heat in uav.microservicesHeat:
+            for heat in uav.ms_heats:
                 if (heat > max_heat):
                     max_heat = heat
         longest_path = self.path_cost_matrix.max()
@@ -136,23 +136,23 @@ class GLOMIP(object):
         # Add constraints
         repli_index_constraints = []
         for j, ms in enumerate(self.ms_list):
-            constraint = ms.replicationIndex - gp.quicksum(self.X[:,j]) == 0
+            constraint = ms.replic_index - gp.quicksum(self.X[:,j]) == 0
             constraint = self.model.addConstr(
                 constraint,
-                name = f"Repl. of {ms.id} >= {ms.replicationIndex}")
+                name = f"Repl. of {ms.id} >= {ms.replic_index}")
             repli_index_constraints.append(constraint)
         cpu_cap_constraints = []
         ram_cap_constraints = []
         for i, uav in enumerate(self.uav_list):
-            constraint = uav.cpuCapacity >= \
-                gp.quicksum([self.X[i,j] * ms.cpuRequirement \
+            constraint = uav.cpu_cap >= \
+                gp.quicksum([self.X[i,j] * ms.cpu_req \
                       for j, ms in enumerate(self.ms_list)])
             constraint = self.model.addConstr(
                 constraint,
                 name = f"CPU cap. of {uav.id} not surpased")
             cpu_cap_constraints.append(constraint)
-            constraint = uav.ramCapacity >= \
-                gp.quicksum([self.X[i,j] * ms.ramRequirement \
+            constraint = uav.ram_cap >= \
+                gp.quicksum([self.X[i,j] * ms.ram_req \
                       for j, ms in enumerate(self.ms_list)])
             constraint = self.model.addConstr(
                 constraint,
@@ -171,7 +171,7 @@ class GLOMIP(object):
         for i, uav in enumerate(self.uav_list):
             for j, ms in enumerate(self.ms_list):
                     for k, uav2 in enumerate(self.uav_list):
-                        ms_heat = self.uav_list[i].microservicesHeat[j]
+                        ms_heat = self.uav_list[i].ms_heats[j]
                         path_cost = self.path_cost_matrix[i,k]
                         y_activation = self.Y[i,j,k] * big_M
                         x = self.X[k,j]
@@ -195,11 +195,11 @@ class GLOMIP(object):
         """
 
         status = self.model.optimize()
-        deployment_dict = { ms.idToInt():[] for ms in self.ms_list}
-        for i, x_row in enumerate(self.X):
-            for j, x in enumerate(x_row):
+        deployment_dict = { ms: [] for ms in self.ms_list}
+        for i, (uav, x_row) in enumerate(zip(self.uav_list, self.X)):
+            for j, (ms, x) in enumerate(zip(self.ms_list, x_row)):
                 if (abs(int(x.x)) == 1):
-                    deployment_dict[self.ms_list[j].idToInt()].append(i)
+                    deployment_dict[ms].append(uav)
         return deployment_dict
 
     def test(self, n_validations):
@@ -214,7 +214,8 @@ class GLOMIP(object):
         rewards = []
         ep_lengths = []
         jumps = []
-        ms_replicas = int(sum([ms.replicationIndex for ms in self.ms_list]))
+        ms_replicas = int(sum([ms.replic_index for ms in self.ms_list]))
+        
         for _ in range(n_validations):
             done = False
             ep_length = 0
@@ -222,17 +223,21 @@ class GLOMIP(object):
             state, info = self.env.reset()
             self.build_model()
             solution_dict = self.solve()
-            jumps.append(sum([z.x for z in self.Z.flatten()]))
-            while (not done):
-                action = solution_dict[state[-ms_replicas]].pop(0)
-                next_state, reward, terminated, truncated, info =\
-                    self.env.step(action)
-                action = solution_dict[state[-ms_replicas]]
-                state = next_state
-                done = terminated or truncated
-                ep_length += 1
-                ep_reward += reward
+            for ms, uavs in solution_dict.items():
+                for uav in uavs:
+                    action_ms = list(self.ms_list).index(ms)
+                    action_uav = list(self.uav_list).index(uav)
+                    action = [action_ms, action_uav]
+                    next_state, reward, terminated, truncated, info =\
+                        self.env.step(action)
+                    done = terminated or truncated
+                    ep_length += 1
+                    ep_reward += reward
+                    if (done):
+                        jump_sum = self.env.get_wrapper_attr("network_graph").get_total_cost()
             rewards.append(ep_reward)
             ep_lengths.append(ep_length)
+            jumps.append(jump_sum)
         return sum(rewards) / n_validations, sum(ep_lengths) / n_validations, sum(jumps) / n_validations
+
 

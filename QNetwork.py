@@ -26,7 +26,7 @@ class QNetwork(nn.Module):
           size of the output layer.
         - layers: a list with the number of Linear layers and their
           number of neurons.
-        - device: str = the device for pytorch (cupda or cpu).
+        - device: str = the device for pytorch (cuda or cpu).
         """
 
         super(QNetwork, self).__init__()
