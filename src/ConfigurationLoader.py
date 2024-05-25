@@ -128,8 +128,6 @@ class ConfigurationLoader(object):
 
         n_obs = gym.spaces.utils.flatten_space(
                     self.env.observation_space).shape[0]
-        g = self.env.get_wrapper_attr("network_graph")
-        n_obs_per_uav = len(g.ms_list) + 2
         n_act = self.env.action_space[0].n * self.env.action_space[1].n
         config = self.configuration["hyperparameters"]["q_estimator"]
         network_type = "dueling"
@@ -137,13 +135,14 @@ class ConfigurationLoader(object):
             network_type = config["type"]
         layers = config["layers"]
         if (network_type == "graph_dueling"):
+            n_uavs = len(self.env.get_wrapper_attr("network_graph").uav_list)
+            n_mss = len(self.env.get_wrapper_attr("network_graph").ms_list)
             policy_net = QDuelingGraphNetwork(n_obs,
-                                              n_obs_per_uav,
-                                              n_act,
+                                              n_uavs,
+                                              n_mss,
                                               layers,
-                                              1,
                                               device = self.device)
-        elif (network_type == "dueling"):
+        if (network_type == "dueling"):
             policy_net = QDuelingNetwork(n_obs,
                                          n_act,
                                          layers,
@@ -167,13 +166,14 @@ class ConfigurationLoader(object):
         target_net = None
         if (variation == "ddqn" or variation == "target"):
             if (network_type == "graph_dueling"):
+                n_uavs = len(self.env.get_wrapper_attr("network_graph").uav_list)
+                n_mss = len(self.env.get_wrapper_attr("network_graph").ms_list)
                 target_net = QDuelingGraphNetwork(n_obs,
-                                                  n_obs_per_uav,
-                                                  n_act,
-                                                  layers,
-                                                  1,
-                                                  device = self.device)
-            elif (network_type == "dueling"):
+                                  n_uavs,
+                                  n_mss,
+                                  layers,
+                                  device = self.device)
+            if (network_type == "dueling"):
                 target_net = QDuelingNetwork(n_obs,
                                              n_act,
                                              layers,
@@ -185,7 +185,7 @@ class ConfigurationLoader(object):
                                       device = self.device)
             target_net.load_state_dict(policy_net.state_dict())
         if (not os.path.exists("models")):
-            os.makedirs("models")
+            os.makedirs("../models")
         output_path = "../models/" + self.configuration["id"] + ".pt"
         q_estimator = QEstimator(policy_net,
                                  optim,

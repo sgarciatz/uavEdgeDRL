@@ -59,24 +59,25 @@ class NetworkEnv(gym.Env):
         uav_observation = self.network_graph.get_uav_info()
         uav_ms_cost_obs = []
         for uav in uav_observation.values():
-            [uav_ms_cost_obs.append(value) for value in uav['ms_costs']]
+            [uav_ms_cost_obs.append(value) / self.max_uav_ms_cost \
+             self. for value in uav['ms_costs']]
         uav_ram_left_obs = []
         for uav in uav_observation.values():
-            uav_ram_left_obs.append(uav['ram_left'])
+            uav_ram_left_obs.append(uav['ram_left'] / self.max_ram_cap)
         uav_cpu_left_obs = []
         for uav in uav_observation.values():
-            uav_cpu_left_obs.append(uav['cpu_left'])
+            uav_cpu_left_obs.append(uav['cpu_left'] / self.max_cpu_cap)
 
         ms_observation = self.network_graph.get_ms_info()
         ms_ram_left_obs = []
         for ms in ms_observation.values():
-            ms_ram_left_obs.append(ms['ram_req'])
+            ms_ram_left_obs.append(ms['ram_req'] / self.max_ram_req)
         ms_cpu_req_obs = []
         for ms in ms_observation.values():
-            ms_cpu_req_obs.append(ms['cpu_req'])
+            ms_cpu_req_obs.append(ms['cpu_req'] / self.max_cpu_req)
         ms_repl_index = []
         for ms in ms_observation.values():
-            ms_repl_index.append(ms['replic_left'])
+            ms_repl_index.append(ms['replic_left'] / self.max_repl_index)
 
         return np.concatenate((uav_ms_cost_obs, uav_ram_left_obs,
                                uav_cpu_left_obs, ms_ram_left_obs,
@@ -97,10 +98,10 @@ class NetworkEnv(gym.Env):
         current_solution = self.network_graph.get_total_cost()
         solution_ratio = current_solution / self.worstCaseSolution
         reward = (1 - solution_ratio) * extra_steps_penalty
-        print("Episode Reward:  ", reward,
-              "\n  -Extra steps:  ", extra_steps,
-              "\n  -Current Hops: ", current_solution,
-              "\n  -Worst Hops:  ", self.worstCaseSolution)
+#        print("Episode Reward:  ", reward,
+#              "\n  -Extra steps:  ", extra_steps,
+#              "\n  -Current Hops: ", current_solution,
+#              "\n  -Worst Hops:  ", self.worstCaseSolution)
         return reward
 
     def build_env(self, input_file):
@@ -165,54 +166,55 @@ class NetworkEnv(gym.Env):
 
         uav_ms_cost = len(self.network_graph.uav_list)\
                       * len(self.network_graph.ms_list)
-
+        self.max_uav_ms_cost = 5 * (self.network_graph.diameter+1)
         uav_ram_left = len(self.network_graph.uav_list)
-        max_ram_cap = max([uav.ram_cap for uav in self.network_graph.uav_list])
+        self.max_ram_cap = max([uav.ram_cap for uav in self.network_graph.uav_list])
+        
         uav_cpu_left = len(self.network_graph.uav_list)
-        max_cpu_cap = max([uav.cpu_cap for uav in self.network_graph.uav_list])
+        self.max_cpu_cap = max([uav.cpu_cap for uav in self.network_graph.uav_list])
 
         ms_ram_req = len(self.network_graph.ms_list)
-        max_ram_req = max([ms.ram_req for ms in self.network_graph.ms_list])
+        self.max_ram_req = max([ms.ram_req for ms in self.network_graph.ms_list])
         ms_cpu_req = len(self.network_graph.ms_list)
-        max_cpu_req = max([ms.cpu_req for ms in self.network_graph.ms_list])
+        self.max_cpu_req = max([ms.cpu_req for ms in self.network_graph.ms_list])
 
 
         ms_repl_index = len(self.network_graph.ms_list)
-        max_repl_index =\
+        self.max_repl_index =\
             max([ms.replic_index for ms in self.network_graph.ms_list])
         
         uav_ms_cost_obs = Box(low=0,
-                              high=5*(self.network_graph.diameter+1),
+                              high=1,
                               shape=(uav_ms_cost,),
-                              dtype= np.intc)
+                              dtype=np.float32)
         uav_ram_left_obs = Box(low=0,
-                               high=max_ram_cap,
+                               high=1,
                                shape=(uav_ram_left,),
-                               dtype= np.intc)
+                               dtype=np.float32)
         uav_cpu_left_obs = Box(low=0,
-                               high=max_cpu_cap,
+                               high=1,
                                shape=(uav_cpu_left,),
-                               dtype=np.intc)
+                               dtype=np.float32)
         ms_ram_req_obs = Box(low=0,
-                              high=max_ram_req,
+                              high=1,
                               shape=(ms_ram_req,),
-                              dtype= np.intc)
+                              dtype=np.float32)
         ms_cpu_req_obs = Box(low=0,
-                              high=max_cpu_req,
+                              high=1,
                               shape=(ms_cpu_req,),
-                              dtype= np.intc)
+                              dtype=np.float32)
         ms_repl_index = Box(low=0,
-                            high=max_repl_index,
+                            high=1,
                             shape=(ms_repl_index,),
-                            dtype=np.intc)
+                            dtype=np.float32)
 
         self.observation_space = Tuple(
             (uav_ms_cost_obs, uav_ram_left_obs, uav_cpu_left_obs,
              ms_ram_req_obs, ms_cpu_req_obs, ms_repl_index),
             seed=42)
+
         self.observation_space = gym.spaces.utils.flatten_space(
             self.observation_space)
-
 
     def is_terminal_state(self):
 
@@ -284,8 +286,8 @@ class NetworkEnv(gym.Env):
         terminated = self.is_terminal_state()
         if (terminated):
             reward = self._get_reward()
-        self.network_graph.draw_graph()
-        self.network_graph.draw_path_costs()
+#        self.network_graph.draw_graph()
+#        self.network_graph.draw_path_costs()
         return observation, reward, terminated, False, info
 
 if __name__ == "__main__":

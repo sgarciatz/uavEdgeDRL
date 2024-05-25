@@ -27,7 +27,7 @@ class TrainLogger(object):
           directory.
         -experiment_info: a summary of the training parameters.
         """
-        output_dir = f"runs/{training_name}"
+        output_dir = f"../runs/{training_name}"
         self.writer = SummaryWriter(log_dir=output_dir)
         self.writer.add_text("run_params", experiment_info)
         self.data = []

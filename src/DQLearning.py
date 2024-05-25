@@ -90,7 +90,7 @@ class DQLearning(object):
                 state = next_state
             raw_state = torch.Tensor(state).to(self.device)
             with (torch.no_grad()):
-                q_tar = self.q_estimator.q_estimator((raw_state, info[0]))
+                q_tar = self.q_estimator.q_estimator(raw_state)
             action = self.action_selector.select_action(q_tar)
             next_state, reward, terminated, truncated, info =\
                 self.environment.step(self.fold_action(action))
@@ -126,7 +126,7 @@ class DQLearning(object):
             state = torch.Tensor(state).to(self.device)
             while (not done):
                 with (torch.no_grad()):
-                    q_estimate = self.q_estimator.q_estimator((state, info[0]))
+                    q_estimate = self.q_estimator.q_estimator(state)
                 action = self.action_selector.select_action(q_estimate)
                 next_state, reward, terminated, truncated, info =\
                 self.environment.step(self.fold_action(action))
@@ -228,7 +228,7 @@ class DQLearning(object):
             state = torch.Tensor(state).to(self.device)
             while (not done):
                 with (torch.no_grad()):
-                    q_estimate = self.q_estimator.q_estimator((state, info[0]))
+                    q_estimate = self.q_estimator.q_estimator(state)
                 action = q_estimate.argmax().item()
                 next_state, reward, terminated, truncated, info =\
                     self.environment.step(self.fold_action(action))

@@ -36,7 +36,7 @@ class QEstimator(object):
                  update_param = 50,
                  second_q_estimator: nn.Module = None,
                  variation: str = "ddqn",
-                 output_path: str = "models/modelito.pt"
+                 output_path: str = "../models/modelito.pt"
                  ):
 
         """

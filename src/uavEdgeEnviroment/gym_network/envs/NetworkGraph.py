@@ -314,7 +314,7 @@ class NetworkGraph(object):
         heatmaps for each microservice. Calculate the worst cost
         """
 
-        self.generate_heatmaps()
+        #self.generate_heatmaps()
         for uav in self.uav_list:
             uav.ram_left = uav.ram_cap
             uav.cpu_left = uav.cpu_cap
