@@ -184,7 +184,7 @@ class ConfigurationLoader(object):
                                       layers,
                                       device = self.device)
             target_net.load_state_dict(policy_net.state_dict())
-        if (not os.path.exists("models")):
+        if (not os.path.exists("../models")):
             os.makedirs("../models")
         output_path = "../models/" + self.configuration["id"] + ".pt"
         q_estimator = QEstimator(policy_net,

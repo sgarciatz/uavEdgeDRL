@@ -32,11 +32,9 @@ class QDuelingGraphNetwork(nn.Module):
         self.dim = int(math.sqrt(self.n_uavs))
         self.n_mss = n_mss
         self.n_actions = n_uavs * n_mss
+        self.device = device
         input_layer = nn.Linear(n_obs, layers[0])
         hidden_layers = []
-        self.conv_kernel = torch.tensor([[2, 2, 2],
-                                         [2, 1, 2],
-                                         [2, 2, 2]], dtype=torch.float32) 
         for layer in layers[1:-1]:
             hidden_layers.append(nn.Linear(layer[0], layer[1]))
             hidden_layers.append(nn.ReLU())
@@ -48,7 +46,7 @@ class QDuelingGraphNetwork(nn.Module):
         self.value_output_layer = nn.Linear(layers[-1], 1).to(device)
         self.adv_output_layer = nn.Linear(layers[-1], self.n_actions).to(device)
         self._build_kernel(self.dim)
-        
+
     def forward(self, x):
 
         """Feed input data into the QDuelingNetwork
@@ -59,10 +57,11 @@ class QDuelingGraphNetwork(nn.Module):
 
         x = self.apply_conv(x.repeat(1,1))
         y = self.layer_stack(x)
-        value = self.value_output_layer(y)
+        #value = self.value_output_layer(y)
         adv = self.adv_output_layer(y)
-        adv_mean = torch.mean(adv, dim=0, keepdim=True)
-        return value + adv - adv_mean
+        #adv_mean = torch.mean(adv, dim=0, keepdim=True)
+        #return value + adv - adv_mean
+        return adv
 
     def apply_conv(self, x):
 
@@ -79,10 +78,11 @@ class QDuelingGraphNetwork(nn.Module):
                          self.kernel,
                          stride=1,
                          groups=self.n_mss,
-                         padding="same")
+                         padding="same").to(self.device)
         y_conv = y_conv.reshape((-1, self.n_uavs, self.n_mss))
         y_conv = y_conv.transpose(2, 1)
         y_conv = y_conv.reshape((-1, self.n_mss * self.n_uavs))
+        y_conv = torch.div(y_conv, self.max_cost)
         x[:, 0:self.n_mss * self.n_uavs] = y_conv
         return x
 
@@ -120,5 +120,8 @@ class QDuelingGraphNetwork(nn.Module):
         self.kernel[0:diameter,diameter:] = aux_t_right
         self.kernel[diameter:,diameter:] = aux_b_right
         self.kernel = torch.from_numpy(self.kernel)
-        self.kernel = self.kernel.repeat(self.n_mss,1,1,1)
-
+        self.kernel = self.kernel.repeat(self.n_mss,1,1,1).to(self.device)
+        self.max_cost = torch.tensor(self.kernel[0:diameter,0:diameter],
+                                     dtype=torch.float32).to(self.device)
+        self.max_cost = self.max_cost.sum()
+        print(self.max_cost)

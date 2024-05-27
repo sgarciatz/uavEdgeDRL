@@ -59,8 +59,8 @@ class NetworkEnv(gym.Env):
         uav_observation = self.network_graph.get_uav_info()
         uav_ms_cost_obs = []
         for uav in uav_observation.values():
-            [uav_ms_cost_obs.append(value) / self.max_uav_ms_cost \
-             self. for value in uav['ms_costs']]
+            [uav_ms_cost_obs.append(value / self.max_uav_ms_cost) \
+             for value in uav['ms_costs']]
         uav_ram_left_obs = []
         for uav in uav_observation.values():
             uav_ram_left_obs.append(uav['ram_left'] / self.max_ram_cap)
@@ -82,7 +82,7 @@ class NetworkEnv(gym.Env):
         return np.concatenate((uav_ms_cost_obs, uav_ram_left_obs,
                                uav_cpu_left_obs, ms_ram_left_obs,
                                ms_cpu_req_obs, ms_repl_index),
-                              dtype=np.int32)
+                              dtype=np.float32)
 
     def _get_reward(self) -> float:
 
