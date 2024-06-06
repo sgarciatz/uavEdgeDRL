@@ -1,7 +1,7 @@
 from collections import deque
 import random
 import torch
-from Experience import Experience
+from .Experience import Experience
 
 
 class ExperienceSampler:

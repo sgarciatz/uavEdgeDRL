@@ -5,7 +5,7 @@ import torch
 import time
 from pathlib import Path
 from .ConfigurationLoader import ConfigurationLoader
-from GLOMIP import GLOMIP
+from .GLOMIP import GLOMIP
 
 
 def parse_arguments ():

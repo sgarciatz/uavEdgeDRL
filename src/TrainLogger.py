@@ -1,6 +1,7 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 from torch.utils.tensorboard import SummaryWriter
+from pathlib import Path
 
 class TrainLogger(object):
 
@@ -27,7 +28,9 @@ class TrainLogger(object):
           directory.
         -experiment_info: a summary of the training parameters.
         """
-        output_dir = f"../runs/{training_name}"
+        output_dir = Path.joinpath(Path(__file__).parent.parent,
+                                   "runs",
+                                   training_name)
         self.writer = SummaryWriter(log_dir=output_dir)
         self.writer.add_text("run_params", experiment_info)
         self.data = []
@@ -85,7 +88,7 @@ class TrainLogger(object):
         Print the results of a training step.
         """
         row = self.data[-1]
-        
+
         step_str = str(row["Training Step"]).center(8)
         loss = row["Loss"]
         loss_str = str(round(loss, 3)).center(8)
@@ -111,7 +114,7 @@ class TrainLogger(object):
 
         """
         Plot the rewards obtained during training.
-        """ 
+        """
 
         df = pd.DataFrame(self.data)
         y = df["Avg episode reward"]
