@@ -1,4 +1,4 @@
-#UAV-EDGE-DRL
+# UAV-EDGE-DRL
 
 This repository contains a modular implementation of a DQN with multiple modifications:
 
