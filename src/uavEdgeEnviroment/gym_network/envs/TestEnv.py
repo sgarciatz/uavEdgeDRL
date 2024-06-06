@@ -8,9 +8,9 @@ class TestEnv(gym.Env):
     """
     TestEnv is a simple enviroment that is meant to test the learning
     capability of different DRL algorithms and variations.
-    
+
     Attributes:
-    - observation_space: A gym space that holds the position of the 
+    - observation_space: A gym space that holds the position of the
      goal and the current position of the agent.
     - action_space: A gym space that holds two possible actions: 0 is
      going downwards and 1 is going upwards.
@@ -63,10 +63,10 @@ class TestEnv(gym.Env):
         super().reset(seed=seed)
         self.agent_pos = 1
         self.goal_pos = 7
-        
+
         observation = self._get_obs()
         info = self._get_info()
-        
+
         return observation, info
 
     def step(self, action):

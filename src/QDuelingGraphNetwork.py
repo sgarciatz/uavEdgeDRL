@@ -11,7 +11,7 @@ class QDuelingGraphNetwork(nn.Module):
     This network is a variation of the traditional QNetwork where the
     output layer is divided into two parts and graph convolutions are
     used to aggregate the input.
-    
+
     The Q value function is calculated as the sum of the V value
     function and the Advantaje value function for each actions minus
     the mean Advantaje value. In that way, the learning process is less
@@ -57,15 +57,15 @@ class QDuelingGraphNetwork(nn.Module):
 
         x = self.apply_conv(x.repeat(1,1))
         y = self.layer_stack(x)
-        #value = self.value_output_layer(y)
+        value = self.value_output_layer(y)
         adv = self.adv_output_layer(y)
-        #adv_mean = torch.mean(adv, dim=0, keepdim=True)
-        #return value + adv - adv_mean
+        adv_mean = torch.mean(adv, dim=1, keepdim=True)
+        return value + adv - adv_mean
         return adv
 
     def apply_conv(self, x):
 
-        """ Apply a non trainable convolutional cross correlation 
+        """ Apply a non trainable convolutional cross correlation
         layer to aggregate all the info about node vecinity.
         """
 
@@ -90,12 +90,12 @@ class QDuelingGraphNetwork(nn.Module):
 
         """ Given the scenario's graph, create a kernel based on its
         diameter.
-        
+
         Example: with a diameter of 4, the kernel would look like this
             4 4 4 4 4 4 4
             4 3 3 3 3 3 4
             4 3 2 2 2 3 4
-            4 3 2 1 2 3 4 
+            4 3 2 1 2 3 4
             4 3 2 2 2 3 4
             4 3 3 3 3 3 4
             4 4 4 4 4 4 4
@@ -104,7 +104,7 @@ class QDuelingGraphNetwork(nn.Module):
         - diameter = The graph diameter.
         """
 
-        dim = (diameter * 2) - 1 
+        dim = (diameter * 2) - 1
 
         self.kernel = np.zeros((dim, dim), dtype=np.float32)
         for i in range(diameter):
@@ -124,4 +124,3 @@ class QDuelingGraphNetwork(nn.Module):
         self.max_cost = torch.tensor(self.kernel[0:diameter,0:diameter],
                                      dtype=torch.float32).to(self.device)
         self.max_cost = self.max_cost.sum()
-        print(self.max_cost)

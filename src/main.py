@@ -4,7 +4,7 @@ import numpy as np
 import torch
 import time
 from pathlib import Path
-from ConfigurationLoader import ConfigurationLoader
+from .ConfigurationLoader import ConfigurationLoader
 from GLOMIP import GLOMIP
 
 
@@ -26,15 +26,18 @@ def parse_arguments ():
                              const=True)
     return args_parser.parse_args()
 
-def train(input_file):
+def train(input_file: Path):
+    """Train an agent using the parameters specified in the input file.
 
-    """Train a agent using the parameters specified in the 
-    input file.
+    Args:
+        input_file (Path): The path of the file that contains the
+        parameters.
 
-    Parameters:
-    - input_file = The file that contains the parameters to train the 
-      agent.
+    Returns:
+        DQLearning: The Trained Agent.
     """
+
+
 
     agent = ConfigurationLoader(input_file).get_agent()
     agent.train()
@@ -92,7 +95,7 @@ def main(args):
     if (is_testing is None):
         agent = train(input_file)
     test_agent(input_file)
-    #test_glomip(input_file)
+    # test_glomip(input_file)
 
 if __name__ == "__main__":
     random.seed(0)

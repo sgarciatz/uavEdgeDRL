@@ -1,12 +1,12 @@
 import torch
-from Policy import Policy
+from .Policy import Policy
 
 
 class BoltzmannPolicy(Policy):
 
 
     """
-    The Boltzmann Policy tries to improve over random exploration by 
+    The Boltzmann Policy tries to improve over random exploration by
     selecting action using their relative Q-values. The action with
     higher Q-values will be chosen with a higher probability.
 
@@ -19,23 +19,24 @@ class BoltzmannPolicy(Policy):
     """
 
     def __init__(self, temperature: float = 1) -> None:
+        """Create the policy and and initializes the
+        temperature parameter
 
-        """
-        Initializes the temperature parameters
+        Args:
+            temperature (float, optional): Defaults to 1.
         """
         self.temperature = temperature
-        
-    def select_action(self, q_values) -> int:
 
-        """
-        Choose the action to apply to the enviroment.
+    def select_action(self, q_values: "torch.tensor") -> int:
+        """Given a a batch of q_values associated to (state, action)
+        tuples, select the one to perform.
 
-        Parameters:
-        - q_values: A tensor is expected with the Q-values of taking an
-         action in the current enviroment's state.
+        Args:
+            q_values (torch.tensor): The batch of q_values
 
         Returns:
-        - int: The index that refers to the selected action
+            int: The index of the action to carry out according to the
+            policy.
         """
 
         try:
@@ -48,17 +49,12 @@ class BoltzmannPolicy(Policy):
             return self.select_action(q_values)
 
 
-    def update_exploration_rate(self, new_value) -> None:
+    def update_exploration_rate(self, new_value: float) -> None:
+        """Update the exploration rate (decreasing it most of the
+        times).
 
-        """
-        Update the temperature parameter
+        Args:
+            new_value (float): the new value of the exploration rate.
         """
 
         self.temperature = new_value
-
-if __name__ == "__main__":
-
-    temperature = 1
-    myPolicy = BoltzmannPolicy(temperature)
-    q_values = torch.tensor ([1, 2, 3])
-    myPolicy.select_action(q_values)

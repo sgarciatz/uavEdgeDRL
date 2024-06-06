@@ -7,7 +7,7 @@ class QDuelingNetwork(nn.Module):
     """
     This network is a variation of the traditional QNetwork where the
     output layer is divided into two parts.
-    
+
     The Q value function is calculated as the sum of the V value
     function and the Advantaje value function for each actions minus
     the mean Advantaje value. In that way, the learning process is less
@@ -28,7 +28,7 @@ class QDuelingNetwork(nn.Module):
           the input layer.
         - n_actions int = the number of different actions and the size
           of the output lauer.
-        - layers: list = a list with the number of Linear layers and 
+        - layers: list = a list with the number of Linear layers and
           their number of neurons.
         - device: str = the device for pytorch (cuda or cpu).
         """
@@ -57,7 +57,9 @@ class QDuelingNetwork(nn.Module):
         """
 
         y = self.layer_stack(x)
+        y = y.repeat(1,1)
         value = self.value_output_layer(y)
         adv = self.adv_output_layer(y)
-        adv_mean = torch.mean(adv, dim=0, keepdim=True)
-        return value + adv - adv_mean
+        adv_mean = torch.mean(adv, dim=1, keepdim=True)
+        output = value + adv - adv_mean
+        return output

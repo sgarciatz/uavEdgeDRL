@@ -1,22 +1,19 @@
 import os
-import random
 import json
-import argparse
-from pathlib import Path
-from QEstimator import QEstimator
-from QNetwork import QNetwork
-from QDuelingNetwork import QDuelingNetwork
-from QDuelingGraphNetwork import QDuelingGraphNetwork
-from ExperienceSampler import ExperienceSampler
-from ActionSelector import ActionSelector
-from TrainLogger import TrainLogger
-from EpsilonGreedyPolicy import EpsilonGreedyPolicy
-from BoltzmannPolicy import BoltzmannPolicy
-from DQLearning import DQLearning
+from .QEstimator import QEstimator
+from .QNetwork import QNetwork
+from .QDuelingNetwork import QDuelingNetwork
+from .QDuelingGraphNetwork import QDuelingGraphNetwork
+from .ExperienceSampler import ExperienceSampler
+from .ActionSelector import ActionSelector
+from .TrainLogger import TrainLogger
+from .EpsilonGreedyPolicy import EpsilonGreedyPolicy
+from .BoltzmannPolicy import BoltzmannPolicy
+from .DQLearning import DQLearning
+import gym_network.envs.ActionUnfolderWrapper as ActionUnfolderWrapper
 import gymnasium as gym
-import numpy as np
 import torch
-import gym_network
+
 
 
 class ConfigurationLoader(object):
@@ -28,7 +25,6 @@ class ConfigurationLoader(object):
     """
 
     def __init__(self, input_path):
-
         """
         Reads a json file and loads the parameters for setup
         the DRL agent training.
@@ -36,7 +32,6 @@ class ConfigurationLoader(object):
         Arguments:
         - input_path: The path where the input file is located.
         """
-
         self.configuration = json.load(open(input_path))
 
         #Set the device for torch
@@ -45,50 +40,30 @@ class ConfigurationLoader(object):
             self.device = torch.device("cuda")
         self.set_env()
 
-    def _flatten_state(self, state) -> list:
-
-        """
-        Helper function used to flatten the state dict in order to feed
-        it to other methods.
-
-        Parameters:
-        - state: the state to flatten.
-        """
-
-        raw_state = []
-        for value in list(state.values()):
-            if (isinstance(value, np.ndarray)):
-                for value2 in value:
-                    raw_state.append(value2)
-            else:
-                raw_state.append(value)
-        return raw_state
-
-
     def set_env(self) -> gym.Env:
-
         """
         Sets the gym enviroment where the agent will be trained.
         """
-
         config = self.configuration["env"]
         env_name = config["name"]
         env_params = None
         if ("params" in config):
             env_params = config["params"]
-            self.env = gym.make(env_name, input_file=env_params)#, render_mode="human")
+            self.env = gym.make(env_name, input_file=env_params, render_mode="human")
+            if (env_name == "NetworkEnv-v0"):
+                network_graph = self.env.get_wrapper_attr("network_graph")
+                n_uavs = len(network_graph.uav_list)
+                self.env = ActionUnfolderWrapper(self.env, n_uavs)
             return
         self.env = gym.make(env_name)
 
 
-    def get_optimizer(self, 
+    def get_optimizer(self,
                       optim_id, policy_net,
                       learning_rate) -> torch.optim.Optimizer:
-
         """
         Maps a configuration parameter to a PyTorch optimizer.
         """
-
         if (optim_id == "adamw"):
             optimizer = torch.optim.AdamW(policy_net.parameters(),
                                           lr=learning_rate,
@@ -104,11 +79,9 @@ class ConfigurationLoader(object):
         return optimizer
 
     def get_loss_fn(self, loss_fn_id):
-
         """
         Maps a configuration parameter to a PyTorch optimizer.
         """
-
         if (loss_fn_id == "mse"):
             loss_fn = torch.nn.MSELoss()
         elif (loss_fn_id == "mae"):
@@ -116,19 +89,19 @@ class ConfigurationLoader(object):
         elif (loss_fn_id == "crossentropy"):
             loss_fn = torch.nn.CrossEntropyLoss()
         elif (loss_fn_id == "huber"):
-            loss_fn = torch.nn.HuberLoss(reduction="sum")
+            loss_fn = torch.nn.HuberLoss()
 
         return loss_fn
 
     def get_q_estimator(self) -> QEstimator:
-
         """
         Given the configuration loaded, create and return a QEstimator.
         """
-
         n_obs = gym.spaces.utils.flatten_space(
                     self.env.observation_space).shape[0]
-        n_act = self.env.action_space[0].n * self.env.action_space[1].n
+        n_act = gym.spaces.utils.flatten_space(self.env.action_space).shape[0]
+        if (isinstance(self.env, ActionUnfolderWrapper)):
+            n_act = self.env.action_space[0].n * self.env.action_space[1].n
         config = self.configuration["hyperparameters"]["q_estimator"]
         network_type = "dueling"
         if ("type" in config):
@@ -200,11 +173,9 @@ class ConfigurationLoader(object):
         return q_estimator
 
     def get_action_selector(self) -> ActionSelector:
-
         """
         Given the configuration, create and return an ActionSelector
         """
-
         config = self.configuration["hyperparameters"]["policy"]
         policy_type = config["type"]
         decay_strat = config["decay_strat"]
@@ -225,11 +196,9 @@ class ConfigurationLoader(object):
         return actionSelector
 
     def get_memory(self) -> ExperienceSampler:
-
         """
         Given the configuration, create and return an ExperienceSampler.
         """
-
         config = self.configuration["hyperparameters"]["memory"]
         memory_type = config["type"]
         memory_size = config["memory_size"]
@@ -243,12 +212,10 @@ class ConfigurationLoader(object):
         return memory
 
     def get_parameters(self) -> dict:
-
         """
         Given the configuration, create a dictionary with the training
         parameters. Also setup the TrainLogger.
         """
-
         parameters = {}
         parameters["id"] = self.configuration["id"]
         parameters["env"] = self.env
@@ -269,11 +236,9 @@ class ConfigurationLoader(object):
         return parameters
 
     def get_agent(self):
-
         """
         Get the agent ready to train.
         """
-
         parameters = self.get_parameters()
         agent = DQLearning(parameters)
         return agent

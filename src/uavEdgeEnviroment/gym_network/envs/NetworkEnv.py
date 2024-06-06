@@ -6,11 +6,7 @@ from gym_network.envs.UAV import UAV
 from gym_network.envs.Microservice import Microservice
 from gym_network.envs.NetworkGraph import NetworkGraph
 import numpy as np
-from perlin_noise import PerlinNoise
-import random
 import math
-import copy
-import matplotlib.pyplot as plt
 
 
 class NetworkEnv(gym.Env):
@@ -116,7 +112,7 @@ class NetworkEnv(gym.Env):
 
         input_data = json.load(open(input_file))
         ms_heatmaps = []
-        
+
         for ms in input_data['microserviceList']:
                 ms_heatmaps.append(ms['heatmap'])
         ms_heatmaps = np.asarray(ms_heatmaps)
@@ -133,7 +129,7 @@ class NetworkEnv(gym.Env):
 
         ms_list = []
         for ms in input_data['microserviceList']:
-                ms_list.append(Microservice(ms['microserviceId'], 
+                ms_list.append(Microservice(ms['microserviceId'],
                                             ms['ramRequirement'],
                                             ms['cpuRequirement'],
                                             float(ms['replicationIndex'])))
@@ -149,7 +145,7 @@ class NetworkEnv(gym.Env):
         because it is used for sampling randomly.
         """
 
-        actions = [len(self.network_graph.ms_list), 
+        actions = [len(self.network_graph.ms_list),
                    len(self.network_graph.uav_list)]
 
         self.action_space = MultiDiscrete(actions,
@@ -169,7 +165,7 @@ class NetworkEnv(gym.Env):
         self.max_uav_ms_cost = 5 * (self.network_graph.diameter+1)
         uav_ram_left = len(self.network_graph.uav_list)
         self.max_ram_cap = max([uav.ram_cap for uav in self.network_graph.uav_list])
-        
+
         uav_cpu_left = len(self.network_graph.uav_list)
         self.max_cpu_cap = max([uav.cpu_cap for uav in self.network_graph.uav_list])
 
@@ -182,7 +178,7 @@ class NetworkEnv(gym.Env):
         ms_repl_index = len(self.network_graph.ms_list)
         self.max_repl_index =\
             max([ms.replic_index for ms in self.network_graph.ms_list])
-        
+
         uav_ms_cost_obs = Box(low=0,
                               high=1,
                               shape=(uav_ms_cost,),
@@ -218,7 +214,7 @@ class NetworkEnv(gym.Env):
 
     def is_terminal_state(self):
 
-        """ Check if all the microservice instances has been 
+        """ Check if all the microservice instances has been
         deployed.
         """
         is_terminal = True
@@ -258,16 +254,16 @@ class NetworkEnv(gym.Env):
     def step(self, action):
 
         """
-        Deploy a microservice in an UAV. 
-        
+        Deploy a microservice in an UAV.
+
         NO - The agent can select from the 5 best destination UAVs. Right
         after taking the action, the agent shall observe the resulting
-        network state, i.e., for each node, its costs and remaining 
+        network state, i.e., for each node, its costs and remaining
         capacity. The agent is only rewarded at the end of the episode
         acording to its improvement with respect to the worst solution.
         The end of the episode is reached when all instances are
         deployed.
-        
+
         The agents chooses the uav to deploy the ms.
         """
 
@@ -290,24 +286,5 @@ class NetworkEnv(gym.Env):
 #        self.network_graph.draw_path_costs()
         return observation, reward, terminated, False, info
 
-if __name__ == "__main__":
-    import matplotlib.pyplot as plt
 
-    myEnv = NetworkEnv('/home/santiago/Documents/Trabajo/Workspace/GLOMIM/glomim_v1/InputScenarios/paper2_large_00.json')
-    observation, info = myEnv.reset()
-    observation, info = myEnv.reset()
-    steps = len(myEnv.msToDeploy)
-    myEnv.network_graph.draw_heatmap(myEnv.network_graph.ms_list[0])
-    myEnv.network_graph.draw_heightmap()
-    obs, reward, terminated, truncated, info = myEnv.step([0, 5])
-    obs, reward, terminated, truncated, info = myEnv.step([0, 26])
-    obs, reward, terminated, truncated, info = myEnv.step([1, 45])
-    obs, reward, terminated, truncated, info = myEnv.step([1, 25])
-    obs, reward, terminated, truncated, info = myEnv.step([2, 2])
-    obs, reward, terminated, truncated, info = myEnv.step([2, 32])
-    obs, reward, terminated, truncated, info = myEnv.step([3, 1])
-    obs, reward, terminated, truncated, info = myEnv.step([3, 55])
-    print(myEnv.network_graph.get_total_cost())
-
-    
 

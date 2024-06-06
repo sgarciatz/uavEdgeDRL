@@ -1,17 +1,7 @@
 import torch
-import torch.optim as optim
-import matplotlib.pyplot as plt
-from itertools import count
 from gymnasium.spaces.utils import flatten_space
 import random
-import math
-from QNetwork import QNetwork
-from QEstimator import QEstimator
-from ExperienceSampler import ExperienceSampler
-from ActionSelector import ActionSelector
-from Experience import Experience
-from EpsilonGreedyPolicy import EpsilonGreedyPolicy
-from BoltzmannPolicy import BoltzmannPolicy
+from .Experience import Experience
 import numpy as np
 import random
 import sys
@@ -93,18 +83,10 @@ class DQLearning(object):
                 q_tar = self.q_estimator.q_estimator(raw_state)
             action = self.action_selector.select_action(q_tar)
             next_state, reward, terminated, truncated, info =\
-                self.environment.step(self.fold_action(action))
+                self.environment.step(action)
             done = terminated or truncated
             experience = Experience(state, action, reward, next_state, done, 99)
             self.experience_sampler.add_experience(experience)
-
-    def fold_action(self, action):
-
-        """Decompose the action into uav and ms."""
-
-        action_uav = action // self.environment.action_space[1].n
-        action_ms = action % self.environment.action_space[1].n
-        return [action_uav, action_ms]
 
     def validate_learning(self, n_validations: int):
 
@@ -129,7 +111,7 @@ class DQLearning(object):
                     q_estimate = self.q_estimator.q_estimator(state)
                 action = self.action_selector.select_action(q_estimate)
                 next_state, reward, terminated, truncated, info =\
-                self.environment.step(self.fold_action(action))
+                self.environment.step(action)
                 state = torch.Tensor(next_state).to(self.device)
                 done = terminated or truncated
                 ep_length += 1
@@ -231,10 +213,10 @@ class DQLearning(object):
                     q_estimate = self.q_estimator.q_estimator(state)
                 action = q_estimate.argmax().item()
                 next_state, reward, terminated, truncated, info =\
-                    self.environment.step(self.fold_action(action))
+                    self.environment.step(action)
                 state = torch.Tensor(next_state).to(self.device)
                 done = terminated or truncated
-                if (done): 
+                if (done):
                     jump_sum = network_graph.get_total_cost()
                 ep_length += 1
                 ep_reward += reward
@@ -242,16 +224,3 @@ class DQLearning(object):
             rewards.append(ep_reward)
             ep_lengths.append(ep_length)
         return sum(rewards) / n_validations, sum(ep_lengths) / n_validations, sum(jumps) / n_validations
-
-if __name__ == "__main__":
-    import gymnasium as gym
-    import gym_network
-    random.seed(0)
-    np.random.seed(0)
-    torch.manual_seed(0)
-#    myEnv = gym.make('NetworkEnv-v0', input_file='/home/santiago/Documents/Trabajo/Workspace/GLOMIM/glomim_v1/InputScenarios/paper2_small_01.json')
-    myEnv = gym.make("CartPole-v1")
-#    myEnv = gym.make("TestEnv-v0")
-    agent = DQLearning(myEnv)
-    agent.train()
-    agent.logger.plot_rewards()
